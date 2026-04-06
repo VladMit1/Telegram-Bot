@@ -62,7 +62,21 @@ function App() {
    const importFromTelegram = () => {
       // 1. Пытаемся взять объект из window (самый надежный способ)
       const tg = window.Telegram?.WebApp || WebApp;
+      // Прямое обращение к глобальному объекту Телеграма
 
+      if (tg && tg.version && parseFloat(tg.version) >= 6.9) {
+         tg.showContactPicker((result) => {
+            // ... твой код отправки на бэкенд
+            setError(
+               `Выбран контакт: ${result.users[0].first_name || 'Имя не найдено'}`
+            );
+            console.log('Результат выбора контакта:', result);
+         });
+      } else {
+         setError(
+            `Версия API: ${tg?.version || 'не найдена'}. Обновите Telegram!`
+         );
+      }
       // 2. Проверяем, поддерживает ли текущая версия Телеграма этот метод
       if (tg && tg.showContactPicker) {
          tg.showContactPicker((result) => {
@@ -132,17 +146,17 @@ function App() {
          setError(`Не удалось добавить: ${e.message}`);
       }
    };
-useEffect(() => {
-   if (WebApp && WebApp.ready) {
-      WebApp.ready();
-      // Выведи версию API в консоль или в ошибку для проверки
-      console.log("Версия API:", WebApp.version);
-      if (parseFloat(WebApp.version) < 6.9) {
-         setError(`Версия API ${WebApp.version} слишком стара. Нужно 6.9+`);
+   useEffect(() => {
+      if (WebApp && WebApp.ready) {
+         WebApp.ready();
+         // Выведи версию API в консоль или в ошибку для проверки
+         console.log('Версия API:', WebApp.version);
+         if (parseFloat(WebApp.version) < 6.9) {
+            setError(`Версия API ${WebApp.version} слишком стара. Нужно 6.9+`);
+         }
       }
-   }
-   fetchContacts();
-}, []);
+      fetchContacts();
+   }, []);
    return (
       <div className="app-container">
          {/* Плашка ошибки (видна только если что-то не так) */}
