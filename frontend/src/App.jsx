@@ -44,9 +44,18 @@ function App() {
 
    // 3. Функция выбора контакта из Telegram
    const importFromTelegram = () => {
+      const tg = window.Telegram?.WebApp;
+
+      // Проверяем наличие метода напрямую, а не через цифры версии
       if (tg && tg.showContactPicker) {
+         setDebugInfo('Открываю список контактов...');
+
          tg.showContactPicker((result) => {
-            if (!result?.users?.length) return;
+            // Если пользователь закрыл окно или не выбрал контакт
+            if (!result || !result.users || result.users.length === 0) {
+               setDebugInfo('Контакт не выбран');
+               return;
+            }
 
             const user = result.users[0];
             const newContact = {
@@ -67,18 +76,23 @@ function App() {
                },
                body: JSON.stringify(newContact),
             })
-               .then(() => {
-                  fetchContacts();
-                  tg.HapticFeedback?.notificationOccurred('success');
+               .then((res) => {
+                  if (!res.ok) throw new Error('Ошибка сервера');
+                  return res.json();
                })
-               .catch((err) =>
-                  setDebugInfo(`Ошибка сохранения: ${err.message}`)
-               );
+               .then(() => {
+                  fetchContacts(); // Обновляем список на экране
+                  setDebugInfo('Контакт успешно добавлен!');
+                  if (tg.HapticFeedback)
+                     tg.HapticFeedback.notificationOccurred('success');
+               })
+               .catch((err) => {
+                  setDebugInfo(`Ошибка сохранения: ${err.message}`);
+               });
          });
       } else {
-         const currentVer = tg?.version || 'неизвестна';
          setDebugInfo(
-            `Метод недоступен. Ваша версия API: ${currentVer} (нужно 6.9+)`
+            'Критическая ошибка: Метод showContactPicker не найден в SDK'
          );
       }
    };
