@@ -1,101 +1,119 @@
-import { useState, useEffect } from 'react';
-import WebApp from '@twa-dev/sdk';
+import { useState, useEffect, useCallback } from 'react';
 import './App.css';
 
+// ВАЖНО: Убедись, что ссылка актуальна!
 const API_URL = 'https://cb96-93-159-3-156.ngrok-free.app/api';
 
 function App() {
    const [contacts, setContacts] = useState([]);
-   const [debugInfo, setDebugInfo] = useState('Загрузка...');
+   const [debugInfo, setDebugInfo] = useState('Инициализация...');
 
-   // === ФУНКЦИЯ ЗАГРУЗКИ (ОНА ТУТ) ===
-   const fetchContacts = async () => {
+   // Достаем объект Telegram напрямую из окна браузера
+   const tg = window.Telegram?.WebApp;
+
+   // 1. Функция загрузки списка (вынесена в useCallback для стабильности)
+   const fetchContacts = useCallback(async () => {
       try {
          const response = await fetch(`${API_URL}/contacts`, {
             headers: { 'ngrok-skip-browser-warning': 'true' },
          });
+
+         if (!response.ok) throw new Error(`Ошибка: ${response.status}`);
+
          const data = await response.json();
          setContacts(data);
 
-         // Показываем версию API Телеграма, чтобы понять, почему кнопка может не работать
-         const version = window.Telegram?.WebApp?.version || 'не определена';
-         setDebugInfo(`Версия API Telegram: ${version}`);
+         const version = tg?.version || 'не найдена';
+         setDebugInfo(`Версия API: ${version}`);
       } catch (e) {
          setDebugInfo(`Ошибка сети: ${e.message}`);
+         console.error(e);
+      }
+   }, [tg]);
+
+   // 2. Эффект при запуске
+   useEffect(() => {
+      if (tg) {
+         tg.ready();
+         tg.expand();
+      }
+
+      // Вызываем загрузку данных
+      fetchContacts();
+   }, [tg, fetchContacts]);
+
+   // 3. Функция выбора контакта из Telegram
+   const importFromTelegram = () => {
+      if (tg && tg.showContactPicker) {
+         tg.showContactPicker((result) => {
+            if (!result?.users?.length) return;
+
+            const user = result.users[0];
+            const newContact = {
+               name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+               phone: user.phone_number || '',
+               time: new Date().toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+               }),
+            };
+
+            // Отправка на бэкенд
+            fetch(`${API_URL}/contacts`, {
+               method: 'POST',
+               headers: {
+                  'Content-Type': 'application/json',
+                  'ngrok-skip-browser-warning': 'true',
+               },
+               body: JSON.stringify(newContact),
+            })
+               .then(() => {
+                  fetchContacts();
+                  tg.HapticFeedback?.notificationOccurred('success');
+               })
+               .catch((err) =>
+                  setDebugInfo(`Ошибка сохранения: ${err.message}`)
+               );
+         });
+      } else {
+         const currentVer = tg?.version || 'неизвестна';
+         setDebugInfo(
+            `Метод недоступен. Ваша версия API: ${currentVer} (нужно 6.9+)`
+         );
       }
    };
 
-   // Выполняется один раз при запуске приложения
-   // Инициализация при запуске
-   useEffect(() => {
-      // 1. Сообщаем Телеграму, что приложение готово
-      WebApp.ready();
-      WebApp.expand();
+   // 4. Логика звонка
+   const handleCall = (contact) => {
+      if (contact.phone) {
+         window.location.href = `tel:${contact.phone}`;
 
-      // 2. Вызываем загрузку контактов
-      const loadInitialData = async () => {
-         await fetchContacts();
-      };
-
-      loadInitialData();
-
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, []);
-
-   // Функция выбора контакта
-   const importFromTelegram = () => {
-      const tg = window.Telegram?.WebApp;
-
-      if (!tg || !tg.showContactPicker) {
-         setDebugInfo(
-            `Метод showContactPicker недоступен (Версия: ${tg?.version})`
-         );
-         return;
-      }
-
-      tg.showContactPicker((result) => {
-         if (!result?.users?.[0]) return;
-
-         const user = result.users[0];
-         const newContact = {
-            name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
-            phone: user.phone_number || '',
-            time: new Date().toLocaleTimeString([], {
-               hour: '2-digit',
-               minute: '2-digit',
-            }),
-         };
-
-         // Отправка на бэкенд
-         fetch(`${API_URL}/contacts`, {
+         // Отправляем статистику на бэкенд
+         fetch(`${API_URL}/call/${contact.id}`, {
             method: 'POST',
-            headers: {
-               'Content-Type': 'application/json',
-               'ngrok-skip-browser-warning': 'true',
-            },
-            body: JSON.stringify(newContact),
-         })
-            .then(() => {
-               fetchContacts(); // <--- Перезагружаем список после добавления!
-               tg.HapticFeedback?.notificationOccurred('success');
-            })
-            .catch((err) => setDebugInfo(`Ошибка сохранения: ${err.message}`));
-      });
+            headers: { 'ngrok-skip-browser-warning': 'true' },
+         }).then(() => fetchContacts());
+      }
    };
 
    return (
       <div className="app-container">
-         {/* Плашка с версией API сверху */}
+         {/* Отладочная информация сверху */}
          <div
-            className="debug-header"
-            style={{ padding: '5px', fontSize: '11px', color: '#666' }}
+            className="debug-bar"
+            style={{
+               fontSize: '10px',
+               color: '#888',
+               textAlign: 'center',
+               padding: '5px',
+            }}
          >
             {debugInfo}
          </div>
 
          <div className="list-area">
             {contacts.length === 0 ? (
-               <p className="empty-msg">Список пуст</p>
+               <p className="empty-msg">Список контактов пуст</p>
             ) : (
                contacts.map((c) => (
                   <div key={c.id} className="contact-card">
@@ -103,12 +121,7 @@ function App() {
                         <strong>{c.name}</strong>
                         <span>Звонков: {c.calls || 0}</span>
                      </div>
-                     <button
-                        className="call-btn"
-                        onClick={() =>
-                           (window.location.href = `tel:${c.phone}`)
-                        }
-                     >
+                     <button className="call-btn" onClick={() => handleCall(c)}>
                         📞
                      </button>
                   </div>
