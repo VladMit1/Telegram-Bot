@@ -132,7 +132,17 @@ function App() {
          setError(`Не удалось добавить: ${e.message}`);
       }
    };
-
+useEffect(() => {
+   if (WebApp && WebApp.ready) {
+      WebApp.ready();
+      // Выведи версию API в консоль или в ошибку для проверки
+      console.log("Версия API:", WebApp.version);
+      if (parseFloat(WebApp.version) < 6.9) {
+         setError(`Версия API ${WebApp.version} слишком стара. Нужно 6.9+`);
+      }
+   }
+   fetchContacts();
+}, []);
    return (
       <div className="app-container">
          {/* Плашка ошибки (видна только если что-то не так) */}
