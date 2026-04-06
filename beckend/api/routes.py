@@ -1,46 +1,26 @@
-from fastapi import FastAPI, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter
 from database.db_manager import db
-from modules.analytics import register_call
+from controller.bot_logic import bot
 
-app = FastAPI()
+router = APIRouter()
 
-# Настройка CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@router.get("/contacts")
+def get_contacts():
+    raw = db.get_all()
+    return [{"id": r[0], "name": r[1], "phone": r[2], "time": r[3], "calls": r[4]} for r in raw]
 
-# В блоке CORS или в самом начале обработки запроса
-@app.get("/api/contacts")
-async def get_contacts(response: Response):
-    # Эта строчка заставляет ngrok НЕ показывать страницу-заглушку
-    response.headers["ngrok-skip-browser-warning"] = "any_value"
-    return db.get_all_contacts()
-
-@app.get("/api/stats")
-async def get_stats():
-    # Пример будущего модуля аналитики
-    contacts = db.get_all_contacts()
-    return {"total": len(contacts), "calls": sum(c['calls'] for c in contacts)}
-
-@app.post("/api/call/{contact_id}")
-async def make_call(contact_id: int):
-    # Вызываем наш модуль аналитики
-    result = register_call(contact_id)
-    return result
-
-@app.post("/api/contacts")
-async def add_contact(request: Request):
-    data = await request.json()
-    name = data.get("name")
-    phone = data.get("phone")
-    time = data.get("time")
-    
-    # Сохраняем в базу данных
-    db.add_contact(name, time, phone)
-    
-    print(f"📥 Контакт {name} успешно сохранен!")
-    return {"status": "success"}
+@router.delete("/contacts/{contact_id}")
+def delete_contact(contact_id: int):
+    # Достаем ID сообщения бота из базы перед удалением записи
+    info = db.get_contact_info(contact_id)
+    if info:
+        msg_id, chat_id = info
+        try:
+            # Удаляем сообщение-подтверждение из чата
+            bot.delete_message(chat_id, msg_id)
+            print(f"🗑️ Сообщение {msg_id} удалено из чата")
+        except Exception as e:
+            print(f"⚠️ Не удалось удалить в TG: {e}")
+            
+    db.delete_contact(contact_id)
+    return {"status": "ok"}
