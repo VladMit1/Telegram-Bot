@@ -1,66 +1,68 @@
 import { useState, useEffect, useCallback } from 'react';
 import './App.css';
 
-const API_URL = 'https://cb96-93-159-3-156.ngrok-free.app/api'; // ПРОВЕРЬ URL!
+const API_URL = 'https://cb96-93-159-3-156.ngrok-free.app/api';
 
 function App() {
    const [contacts, setContacts] = useState([]);
-   const [debug, setDebug] = useState('Загрузка...');
 
    const fetchContacts = useCallback(async () => {
-      try {
-         // Добавляем timestamp (?t=), чтобы браузер не отдавал старые данные
-         const response = await fetch(`${API_URL}/contacts?t=${Date.now()}`, {
-            headers: { 'ngrok-skip-browser-warning': 'true' },
-         });
-         const data = await response.json();
-         setContacts(data);
-         setDebug(data.length > 0 ? `Всего: ${data.length}` : 'Список пуст');
-      } catch (error) {
-         setDebug('Ошибка API: проверьте ngrok');
-         console.error(error);
-      }
+      const res = await fetch(`${API_URL}/contacts?t=${Date.now()}`, {
+         headers: { 'ngrok-skip-browser-warning': 'true' },
+      });
+      const data = await res.json();
+      setContacts(data);
    }, []);
 
+   const deleteContact = async (id) => {
+      await fetch(`${API_URL}/contacts/${id}`, {
+         method: 'DELETE',
+         headers: { 'ngrok-skip-browser-warning': 'true' },
+      });
+      setContacts((prev) => prev.filter((c) => c.id !== id));
+   };
+
    useEffect(() => {
-      const tg = window.Telegram?.WebApp;
-      if (tg) {
-         tg.ready();
-         tg.expand();
+      if (window.Telegram?.WebApp) {
+         window.Telegram.WebApp.ready();
+         window.Telegram.WebApp.expand();
       }
-
-      // Обертываем вызов в асинхронную функцию внутри эффекта,
-      // чтобы React не ругался на синхронное изменение стейта
-      const init = async () => {
-         await fetchContacts();
+      const initialize = async () => {
+         if (window.Telegram?.WebApp) {
+            fetchContacts();
+         }
       };
-
-      init();
-   }, [fetchContacts]); // Теперь линтер будет доволен
+      initialize();
+   }, [fetchContacts]);
 
    return (
-      <div className="app">
+      <div className="container">
          <div className="header">
-            <span>{debug}</span>
+            <h3>Ученики ({contacts.length})</h3>
             <button onClick={fetchContacts}>🔄</button>
          </div>
-
          <div className="list">
             {contacts.map((c) => (
                <div key={c.id} className="card">
                   <div className="info">
                      <strong>{c.name}</strong>
-                     <small>{c.phone}</small>
+                     <span>{c.phone}</span>
                   </div>
-                  <div className="stats">📞 {c.calls}</div>
-                  <a href={`tel:${c.phone}`} className="call-link">
-                     Позвонить
-                  </a>
+                  <div className="actions">
+                     <button
+                        className="del-btn"
+                        onClick={() => deleteContact(c.id)}
+                     >
+                        🗑️
+                     </button>
+                     <a href={`tel:${c.phone}`} className="call-btn">
+                        📞
+                     </a>
+                  </div>
                </div>
             ))}
          </div>
       </div>
    );
 }
-
 export default App;

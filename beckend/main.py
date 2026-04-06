@@ -1,40 +1,46 @@
-import threading
-import uvicorn
-import sys
-import os
-
-# Путь для импортов
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-from controller.bot_logic import bot
-from api.routes import app
+import telebot
+import json
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from database.db_manager import db
 
-def run_bot():
-    print("🤖 Бот запущен...")
-    bot.polling(none_stop=True)
+# --- НАСТРОЙКИ БОТА ---
+TOKEN = '8709390336:AAFjZsd1FTPOtBbvJEl5KSouwiZgawHMYyc'
+bot = telebot.TeleBot(TOKEN)
+URL_APP = "https://vladmit1.github.io/Telegram-Bot/"
 
-def run_api():
-    print("🌐 API запущен: http://localhost:8000")
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+@bot.message_handler(commands=['start'])
+def start(message):
+    # Устанавливаем кнопку меню слева от ввода
+    bot.set_chat_menu_button(message.chat.id, telebot.types.MenuButtonWebApp("Список учеников", telebot.types.WebAppInfo(url=URL_APP)))
+    
+    # Кнопка над клавиатурой
+    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(telebot.types.KeyboardButton("➕ Добавить ученика", request_contact=True))
+    
+    bot.send_message(message.chat.id, "Кнопка 'Список учеников' закреплена внизу! Присылай контакты для добавления.", reply_markup=markup)
 
-if __name__ == '__main__':
-    # 1. Проверка базы и вывод в консоль
-    try:
-        contacts = db.get_all_contacts()
-        if not contacts:
-            print("📝 База пуста, добавляю тест...")
-            db.add_contact("Иван Проверка", "14:30", "+79001234567")
-            contacts = db.get_all_contacts()
+@bot.message_handler(content_types=['contact'])
+def handle_contact(message):
+    c = message.contact
+    name = f"{c.first_name} {c.last_name or ''}".strip()
+    if db.add_contact(name, "12:00", c.phone_number):
+        bot.send_message(message.chat.id, f"✅ {name} добавлен в список.")
+    else:
+        bot.send_message(message.chat.id, f"ℹ️ {name} уже есть в списке.")
 
-        print("\n" + "="*40)
-        print("📋 ТЕКУЩИЕ КОНТАКТЫ В КОНСОЛИ:")
-        for c in contacts:
-            print(f"ID: {c['id']} | {c['name']} | Звонков: {c['calls']}")
-        print("="*40 + "\n")
-    except Exception as e:
-        print(f"❌ Ошибка базы: {e}")
+# --- API ---
+app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-    # 2. Запуск потоков
-    threading.Thread(target=run_bot, daemon=True).start()
-    run_api()
+@app.get("/api/contacts")
+def get_contacts():
+    return db.get_all_contacts()
+
+@app.delete("/api/contacts/{contact_id}")
+def delete_contact(contact_id: int):
+    db.delete_contact(contact_id)
+    return {"status": "deleted"}
+
+# Запуск бота в отдельном потоке обычно делается через threading, 
+# но для теста просто запусти bot.polling() после app
