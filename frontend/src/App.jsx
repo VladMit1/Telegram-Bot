@@ -47,10 +47,10 @@ function App() {
       const tg = window.Telegram?.WebApp;
 
       // Проверяем наличие метода напрямую, а не через цифры версии
-      if (tg && tg.showContactPicker) {
+      if (tg && tg.requestContact) {
          setDebugInfo('Открываю список контактов...');
 
-         tg.showContactPicker((result) => {
+         tg.requestContact((result) => {
             // Если пользователь закрыл окно или не выбрал контакт
             if (!result || !result.users || result.users.length === 0) {
                setDebugInfo('Контакт не выбран');
