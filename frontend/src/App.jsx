@@ -45,10 +45,18 @@ function App() {
    // 3. Функция выбора контакта из Telegram
    const importFromTelegram = () => {
       const tg = window.Telegram?.WebApp;
-
       // Проверяем наличие метода напрямую, а не через цифры версии
       if (tg && tg.requestContact) {
          setDebugInfo('Открываю список контактов...');
+         setDebugInfo(
+            'Открываю список requestContact...',
+            typeof tg?.requestContact
+         );
+         setDebugInfo(
+            'Открываю список showContactPicker...',
+            typeof tg?.showContactPicker
+         );
+         setDebugInfo('Открываю список onEvent...', typeof tg?.onEvent);
 
          tg.requestContact((result) => {
             // Если пользователь закрыл окно или не выбрал контакт
