@@ -47,16 +47,14 @@ function App() {
       const tg = window.Telegram?.WebApp;
       // Проверяем наличие метода напрямую, а не через цифры версии
       if (tg && tg.requestContact) {
-         setDebugInfo('Открываю список контактов...');
-         setDebugInfo(
-            'Открываю список requestContact...',
-            typeof tg?.requestContact
-         );
-         setDebugInfo(
-            'Открываю список showContactPicker...',
-            typeof tg?.showContactPicker
-         );
-         setDebugInfo('Открываю список onEvent...', typeof tg?.onEvent);
+         setDebugInfo({
+            hasRequestContact: typeof tg?.requestContact,
+            hasShowContactPicker: typeof tg?.showContactPicker,
+            // иногда есть сигналы событий:
+            hasOnContactSelected: typeof tg?.onContactSelected,
+            hasOnEvent: typeof tg?.onEvent,
+            keys: tg ? Object.keys(tg).sort() : null,
+         });
 
          tg.requestContact((result) => {
             // Если пользователь закрыл окно или не выбрал контакт
