@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import WebApp from '@twa-dev/sdk';
 import './App.css';
 
-const API_URL = 'http://localhost:8000/api'; // Не забудь заменить на ngrok URL!
+const API_URL = 'https://cb96-93-159-3-156.ngrok-free.app/api'; // Не забудь заменить на ngrok URL!
 
 function App() {
    const [name, setName] = useState('');
