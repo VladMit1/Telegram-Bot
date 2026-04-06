@@ -59,41 +59,20 @@ function App() {
    };
 
    // 3. Выбор контакта из Telegram (Тот самый 2-й вариант)
-   const importFromTelegram = () => {
-      // 1. Пытаемся взять объект из window (самый надежный способ)
-      const tg = window.Telegram?.WebApp || WebApp;
-      // Прямое обращение к глобальному объекту Телеграма
+  const importFromTelegram = () => {
+      const tg = window.Telegram?.WebApp;
 
       if (tg && tg.version && parseFloat(tg.version) >= 6.9) {
          tg.showContactPicker((result) => {
-            // ... твой код отправки на бэкенд
-            setError(
-               `Выбран контакт: ${result.users[0].first_name || 'Имя не найдено'}`
-            );
-            console.log('Результат выбора контакта:', result);
-         });
-      } else {
-         setError(
-            `Версия API: ${tg?.version || 'не найдена'}. Обновите Telegram!`
-         );
-      }
-      // 2. Проверяем, поддерживает ли текущая версия Телеграма этот метод
-      if (tg && tg.showContactPicker) {
-         tg.showContactPicker((result) => {
-            // Если юзер просто закрыл окно, ничего не делаем
             if (!result || !result.users || result.users.length === 0) return;
 
             const user = result.users[0];
             const newContact = {
                name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
                phone: user.phone_number || '',
-               time: new Date().toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-               }),
+               time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             };
 
-            // Отправляем на твой Бэкенд
             fetch(`${API_URL}/contacts`, {
                method: 'POST',
                headers: {
@@ -102,20 +81,11 @@ function App() {
                },
                body: JSON.stringify(newContact),
             })
-               .then((res) => res.json())
-               .then(() => {
-                  fetchContacts(); // Обновляем список
-                  if (tg.HapticFeedback)
-                     tg.HapticFeedback.notificationOccurred('success');
-               })
-               .catch((err) => setError(`Ошибка сохранения: ${err.message}`));
+            .then(() => fetchContacts())
+            .catch((err) => setError(`Ошибка: ${err.message}`));
          });
       } else {
-         // Если мы здесь — значит метод showContactPicker вообще не найден в объекте
-         setError(
-            'Метод выбора контактов не поддерживается вашей версией Telegram.'
-         );
-         console.error('showContactPicker is missing in:', tg);
+         setError(`Версия ${tg?.version || '?'}: метод не поддерживается. Используйте кнопку в боте!`);
       }
    };
    // 4. Ручное добавление (для тестов)
