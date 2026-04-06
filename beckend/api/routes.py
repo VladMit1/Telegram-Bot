@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from database.db_manager import db
 from modules.analytics import register_call
@@ -13,8 +13,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# В блоке CORS или в самом начале обработки запроса
 @app.get("/api/contacts")
-async def get_contacts():
+async def get_contacts(response: Response):
+    # Эта строчка заставляет ngrok НЕ показывать страницу-заглушку
+    response.headers["ngrok-skip-browser-warning"] = "69420"
     return db.get_all_contacts()
 
 @app.get("/api/stats")
