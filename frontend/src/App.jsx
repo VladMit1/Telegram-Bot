@@ -60,49 +60,50 @@ function App() {
 
    // 3. Выбор контакта из Telegram (Тот самый 2-й вариант)
    const importFromTelegram = () => {
-      if (window.Telegram?.WebApp) {
-         const tg = window.Telegram.WebApp;
+      // 1. Пытаемся взять объект из window (самый надежный способ)
+      const tg = window.Telegram?.WebApp || WebApp;
 
+      // 2. Проверяем, поддерживает ли текущая версия Телеграма этот метод
+      if (tg && tg.showContactPicker) {
          tg.showContactPicker((result) => {
-            if (result && result.users && result.users.length > 0) {
-               const user = result.users[0];
+            // Если юзер просто закрыл окно, ничего не делаем
+            if (!result || !result.users || result.users.length === 0) return;
 
-               const newContact = {
-                  name: `${user.first_name} ${user.last_name || ''}`.trim(),
-                  phone: user.phone_number,
-                  time: new Date().toLocaleTimeString([], {
-                     hour: '2-digit',
-                     minute: '2-digit',
-                  }),
-               };
+            const user = result.users[0];
+            const newContact = {
+               name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+               phone: user.phone_number || '',
+               time: new Date().toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+               }),
+            };
 
-               // Отправляем на бэкенд
-               fetch(`${API_URL}/contacts`, {
-                  method: 'POST',
-                  headers: {
-                     'Content-Type': 'application/json',
-                     'ngrok-skip-browser-warning': 'true',
-                  },
-                  body: JSON.stringify(newContact),
-               })
-                  .then((res) => {
-                     if (!res.ok) throw new Error('Не удалось сохранить');
-                     return res.json();
-                  })
-                  .then(() => {
-                     fetchContacts();
+            // Отправляем на твой Бэкенд
+            fetch(`${API_URL}/contacts`, {
+               method: 'POST',
+               headers: {
+                  'Content-Type': 'application/json',
+                  'ngrok-skip-browser-warning': 'true',
+               },
+               body: JSON.stringify(newContact),
+            })
+               .then((res) => res.json())
+               .then(() => {
+                  fetchContacts(); // Обновляем список
+                  if (tg.HapticFeedback)
                      tg.HapticFeedback.notificationOccurred('success');
-                  })
-                  .catch((err) =>
-                     setError(`Ошибка сохранения: ${err.message}`)
-                  );
-            }
+               })
+               .catch((err) => setError(`Ошибка сохранения: ${err.message}`));
          });
       } else {
-         alert('Откройте это приложение внутри Telegram!');
+         // Если мы здесь — значит метод showContactPicker вообще не найден в объекте
+         setError(
+            'Метод выбора контактов не поддерживается вашей версией Telegram.'
+         );
+         console.error('showContactPicker is missing in:', tg);
       }
    };
-
    // 4. Ручное добавление (для тестов)
    const handleAdd = async () => {
       if (!name.trim()) return;

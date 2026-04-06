@@ -17,7 +17,7 @@ app.add_middleware(
 @app.get("/api/contacts")
 async def get_contacts(response: Response):
     # Эта строчка заставляет ngrok НЕ показывать страницу-заглушку
-    response.headers["ngrok-skip-browser-warning"] = "69420"
+    response.headers["ngrok-skip-browser-warning"] = "any_value"
     return db.get_all_contacts()
 
 @app.get("/api/stats")
@@ -33,14 +33,14 @@ async def make_call(contact_id: int):
     return result
 
 @app.post("/api/contacts")
-async def add_contact_from_web(request: Request):
+async def add_contact(request: Request):
     data = await request.json()
     name = data.get("name")
     phone = data.get("phone")
-    time = data.get("time", "12:00")
+    time = data.get("time")
     
-    # Сохраняем в нашу SQLite базу
+    # Сохраняем в базу данных
     db.add_contact(name, time, phone)
     
-    print(f"✅ Добавлен новый контакт: {name} ({phone})")
-    return {"status": "success", "added": name}    
+    print(f"📥 Контакт {name} успешно сохранен!")
+    return {"status": "success"}
