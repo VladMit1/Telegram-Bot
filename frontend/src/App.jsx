@@ -20,8 +20,18 @@ function App() {
       }
    };
 
+   // В начале файла
+
+   // Внутри useEffect
    useEffect(() => {
-      WebApp.ready();
+      // Попробуй этот вариант, если .ready() падает
+      if (WebApp && WebApp.ready) {
+         WebApp.ready();
+      } else {
+         console.log(
+            'WebApp.ready не найден, возможно он не требуется или SDK загружен иначе'
+         );
+      }
       fetchContacts();
    }, []);
 
