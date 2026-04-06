@@ -6,7 +6,7 @@ import os
 # Путь для импортов
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from bot_logic import bot
+from controller.bot_logic import bot
 from api.routes import app
 from database.db_manager import db
 

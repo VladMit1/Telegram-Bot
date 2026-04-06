@@ -7,7 +7,7 @@ const API_URL = 'http://localhost:8000/api'; // Не забудь заменит
 function App() {
    const [name, setName] = useState('');
    const [contacts, setContacts] = useState([]);
-   console.log("🚀 ~ App ~ contacts:", contacts)
+   console.log('🚀 ~ App ~ contacts:', contacts);
 
    // Загрузка списка
    const fetchContacts = async () => {
@@ -71,7 +71,47 @@ function App() {
       }
       setName(''); // Очищаем поле после добавления
    };
+   const importFromTelegram = () => {
+      // Проверяем, что скрипт Telegram WebApp загружен
+      if (window.Telegram?.WebApp) {
+         const tg = window.Telegram.WebApp;
 
+         // Вызываем системное окно выбора контактов
+         tg.showContactPicker((result) => {
+            // result.users — это массив выбранных контактов
+            if (result && result.users && result.users.length > 0) {
+               const user = result.users[0]; // Берем первого
+
+               const newContact = {
+                  name: `${user.first_name} ${user.last_name || ''}`.trim(),
+                  phone: user.phone_number,
+                  time: new Date().toLocaleTimeString([], {
+                     hour: '2-digit',
+                     minute: '2-digit',
+                  }),
+               };
+
+               // Отправляем данные на твой бэкенд (через адрес ngrok!)
+               fetch(`${API_URL}/contacts`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(newContact),
+               })
+                  .then((res) => res.json())
+                  .then(() => {
+                     fetchContacts(); // Обновляем список на экране, чтобы увидеть новичка
+                     tg.HapticFeedback.notificationOccurred('success'); // Виброотклик
+                  })
+                  .catch((err) => console.error('Ошибка при сохранении:', err));
+            }
+         });
+      } else {
+         alert('Эта функция работает только внутри Telegram!');
+      }
+   };
+
+   // В return добавь кнопку:
+   // <button onClick={importFromTelegram} className="add-btn">Добавить из Telegram</button>
    return (
       <div className="app-container">
          <div className="list-area">
@@ -101,6 +141,9 @@ function App() {
             />
             <button className="add-btn" onClick={handleAdd}>
                ➕ Добавить
+            </button>
+            <button onClick={importFromTelegram} className="add-btn">
+               Добавить из Telegram
             </button>
          </div>
       </div>

@@ -13,9 +13,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/api/contacts")
-async def get_contacts():
-    return db.get_all_contacts()
+@app.post("/api/contacts")
+async def add_contact_from_web(request: Request):
+    data = await request.json()
+    name = data.get("name")
+    phone = data.get("phone")
+    time = data.get("time", "12:00")
+    
+    # Сохраняем в нашу SQLite базу
+    db.add_contact(name, time, phone)
+    
+    print(f"✅ Добавлен новый контакт: {name} ({phone})")
+    return {"status": "success", "added": name}
 
 @app.post("/api/call/{contact_id}")
 async def make_call(contact_id: int):
