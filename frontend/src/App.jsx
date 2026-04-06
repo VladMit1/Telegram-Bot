@@ -7,6 +7,7 @@ const API_URL = 'http://localhost:8000/api'; // Не забудь заменит
 function App() {
    const [name, setName] = useState('');
    const [contacts, setContacts] = useState([]);
+   console.log("🚀 ~ App ~ contacts:", contacts)
 
    // Загрузка списка
    const fetchContacts = async () => {
