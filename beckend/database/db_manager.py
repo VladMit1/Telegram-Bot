@@ -3,12 +3,12 @@ import os
 
 class DBManager:
     def __init__(self):
-        # Автоматическое определение пути к базе в папке backend/
+        # Автоматический путь к базе в папке backend/
         base_dir = os.path.dirname(os.path.abspath(__file__))
         db_path = os.path.normpath(os.path.join(base_dir, '..', 'tracker.db'))
         
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
-        self.init_db()  # Вызываем правильное имя метода
+        self.init_db()
         print(f"🗄️ База подключена: {db_path}")
 
     def init_db(self):
@@ -32,13 +32,18 @@ class DBManager:
         )
         self.conn.commit()
 
+    def increment_call(self, contact_id):
+        cursor = self.conn.cursor()
+        cursor.execute(
+            'UPDATE contacts SET calls_count = calls_count + 1 WHERE id = ?', 
+            (contact_id,)
+        )
+        self.conn.commit()
+
     def get_all_contacts(self):
         cursor = self.conn.cursor()
-        # ДОБАВИЛИ id В ВЫБОРКУ
         cursor.execute('SELECT id, name, phone, time, calls_count FROM contacts ORDER BY id DESC')
         rows = cursor.fetchall()
-        
-        # Возвращаем словарь, понятный для React
         return [
             {
                 "id": r[0], 
@@ -49,5 +54,4 @@ class DBManager:
             } for r in rows
         ]
 
-# Создаем объект базы
 db = DBManager()
