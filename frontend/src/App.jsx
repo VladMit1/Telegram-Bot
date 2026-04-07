@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import './App.css';
 
-const API_URL = 'https://cb96-93-159-3-156.ngrok-free.app/api';
+const API_URL = import.meta.env.VITE_API_URL;
+console.log("🚀 ~ API_URL:", API_URL)
 
 function App() {
    const [contacts, setContacts] = useState([]);
