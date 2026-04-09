@@ -9,6 +9,7 @@ def get_contacts():
     raw = db.get_all()
     return [{"id": r[0], "name": r[1], "phone": r[2], "time": r[3], "calls": r[4]} for r in raw]
 
+
 @router.delete("/contacts/{contact_id}")
 def delete_contact(contact_id: int):
     # Достаем ID сообщения бота из базы перед удалением записи
