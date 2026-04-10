@@ -1,0 +1,19 @@
+* {
+   margin: 0;
+   padding: 0;
+   box-sizing: border-box;
+   -webkit-tap-highlight-color: transparent; // Убирает синюю рамку при клике в TWA
+}
+
+body {
+   line-height: 1.5;
+   -webkit-font-smoothing: antialiased;
+   overflow-x: hidden;
+}
+
+button {
+   cursor: pointer;
+   border: none;
+   background: none;
+   font-family: inherit;
+}

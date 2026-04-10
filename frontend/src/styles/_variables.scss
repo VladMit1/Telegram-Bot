@@ -1,0 +1,12 @@
+// Цвета темы
+$bg-color: var(--tg-theme-bg-color, #ffffff);
+$secondary-bg: var(--tg-theme-secondary-bg-color, #f4f4f5);
+$text-color: var(--tg-theme-text-color, #000000);
+$hint-color: var(--tg-theme-hint-color, #999999);
+$link-color: var(--tg-theme-link-color, #248bed);
+$button-color: var(--tg-theme-button-color, #248bed);
+$button-text: var(--tg-theme-button-text-color, #ffffff);
+
+// Размеры
+$radius: 12px;
+$padding-base: 16px;

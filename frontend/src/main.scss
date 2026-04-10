@@ -1,0 +1,16 @@
+@use './styles/normalize';
+@use './styles/variables' as v; // Даем псевдоним v для удобства
+
+
+
+
+@use './App';
+
+body {
+   background-color: v.$bg-color;
+   color: v.$text-color;
+   font-family:
+      'Inter',
+      -apple-system,
+      sans-serif; // Пример
+}
