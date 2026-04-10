@@ -115,28 +115,56 @@ def handle_search_text(message):
     global search_results_ids
     query = message.text.strip()
     chat_id = message.chat.id
+    
+    # 1. Удаляем запрос пользователя
     try: bot.delete_message(chat_id, message.message_id)
     except: pass
 
-    results = db.search_contacts(query)
-    
-    # Очищаем экран перед показом результатов
+    # 2. ОЧИСТКА ЭКРАНА (с защитой)
+    # Если бот перезагрузился, массив пуст, и он не сможет удалить старое.
+    # Поэтому мы полагаемся на то, что пользователь нажмет /start для полной чистки чата 
+    # или просто удаляем то, что помним.
     for msg_id in search_results_ids:
         try: bot.delete_message(chat_id, msg_id)
         except: pass
     search_results_ids.clear()
 
+    results = db.search_contacts(query)
+
     if not results:
-        temp = bot.send_message(chat_id, f"🔍 По запросу «{query}» ничего не найдено.")
+        # Если ничего не нашли, выводим уведомление
+        temp = bot.send_message(chat_id, f"🔍 По запросу «<b>{query}</b>» ничего не найдено.", parse_mode="HTML")
         time.sleep(2)
         try: bot.delete_message(chat_id, temp.message_id)
         except: pass
-        handle_start(message)
+        
+        # ВАЖНО: Вместо handle_start вызываем отрисовку заново, 
+        # чтобы восстановить массив ID после сбоя сервера
+        refresh_list(chat_id)
         return
 
+    # 3. Выводим результаты
     for r in results:
         msg_id = render_student_card(chat_id, r, is_search=True)
         search_results_ids.append(msg_id)
+
+def refresh_list(chat_id):
+    """Вспомогательная функция для восстановления списка без дубликатов"""
+    global search_results_ids, welcome_msg_id
+    
+    contacts = db.get_all()
+    if not contacts:
+        check_welcome_message(chat_id)
+    else:
+        # Убиваем приветствие если есть
+        if welcome_msg_id:
+            try: bot.delete_message(chat_id, welcome_msg_id)
+            except: pass
+            welcome_msg_id = None
+            
+        for c in contacts:
+            msg_id = render_student_card(chat_id, c)
+            search_results_ids.append(msg_id)
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
