@@ -10,6 +10,7 @@ welcome_msg_id = None
 search_results_ids = []
 
 def render_student_card(chat_id, student_data, is_search=False):
+    # Данные из кортежа (индексы как в твоем коде)
     name = student_data[1]
     phone = student_data[2]
     date_added = student_data[3] if len(student_data) > 3 else "Сегодня"
@@ -21,8 +22,6 @@ def render_student_card(chat_id, student_data, is_search=False):
         types.InlineKeyboardButton("🗑️ Удалить", callback_data=f"del_{phone}")
     )
     markup.add(types.InlineKeyboardButton("📊 Статистика", callback_data=f"stats_{phone}"))
-    
-    # Если в режиме поиска, добавляем кнопку возврата
     if is_search:
         markup.add(types.InlineKeyboardButton("🔙 Назад к списку", callback_data="show_all"))
 
@@ -109,62 +108,44 @@ def handle_contact(message):
         try: bot.delete_message(chat_id, temp.message_id)
         except: pass
 
-# --- ВОТ ОН, ВЕРНУВШИЙСЯ ПОИСК ---
 @bot.message_handler(content_types=['text'])
 def handle_search_text(message):
     global search_results_ids
     query = message.text.strip()
     chat_id = message.chat.id
-    
-    # 1. Удаляем запрос пользователя
     try: bot.delete_message(chat_id, message.message_id)
     except: pass
 
-    # 2. ОЧИСТКА ЭКРАНА (с защитой)
-    # Если бот перезагрузился, массив пуст, и он не сможет удалить старое.
-    # Поэтому мы полагаемся на то, что пользователь нажмет /start для полной чистки чата 
-    # или просто удаляем то, что помним.
     for msg_id in search_results_ids:
         try: bot.delete_message(chat_id, msg_id)
         except: pass
     search_results_ids.clear()
 
     results = db.search_contacts(query)
-
     if not results:
-        # Если ничего не нашли, выводим уведомление
         temp = bot.send_message(chat_id, f"🔍 По запросу «<b>{query}</b>» ничего не найдено.", parse_mode="HTML")
         time.sleep(2)
         try: bot.delete_message(chat_id, temp.message_id)
         except: pass
-        
-        # ВАЖНО: Вместо handle_start вызываем отрисовку заново, 
-        # чтобы восстановить массив ID после сбоя сервера
         refresh_list(chat_id)
         return
 
-    # 3. Выводим результаты
     for r in results:
         msg_id = render_student_card(chat_id, r, is_search=True)
         search_results_ids.append(msg_id)
 
 def refresh_list(chat_id):
-    """Вспомогательная функция для восстановления списка без дубликатов"""
     global search_results_ids, welcome_msg_id
-    
     contacts = db.get_all()
     if not contacts:
         check_welcome_message(chat_id)
     else:
-        # Убиваем приветствие если есть
         if welcome_msg_id:
             try: bot.delete_message(chat_id, welcome_msg_id)
             except: pass
             welcome_msg_id = None
-            
         for c in contacts:
-            msg_id = render_student_card(chat_id, c)
-            search_results_ids.append(msg_id)
+            search_results_ids.append(render_student_card(chat_id, c))
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
@@ -185,7 +166,6 @@ def handle_callbacks(call):
         
         db.delete_contact_by_phone(phone)
         bot.answer_callback_query(call.id, "Удалено")
-        
         if db.get_count() == 0:
             welcome_msg_id = None
             check_welcome_message(chat_id)

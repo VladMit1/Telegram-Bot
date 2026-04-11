@@ -24,6 +24,7 @@ function App() {
       isFetching,
       refetch,
    } = useGetContactsQuery();
+      console.log("🚀 ~ App ~ contacts:", contacts)
 
    const filteredContacts = contacts.filter((c) =>
       c.name.toLowerCase().includes(searchQuery.toLowerCase())
