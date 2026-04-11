@@ -1,0 +1,87 @@
+@use '../../styles/variables' as *; // Импортируем все переменные из variables.scss
+
+.student-card-v2 {
+   background: $secondary-bg;
+   margin: 0 16px 12px;
+   padding: 14px;
+   border-radius: $radius;
+   display: flex;
+   flex-direction: column;
+   gap: 12px;
+
+   .card-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      .avatar {
+         width: 42px;
+         height: 42px;
+         border-radius: 50%;
+         background: $accent;
+         color: $accent-text;
+         @include flex-center;
+         font-weight: bold;
+         font-size: 18px;
+      }
+      .main-info {
+         flex: 1;
+         h3 {
+            margin: 0;
+            font-size: 16px;
+            color: $text;
+         }
+         .sub-info {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: $hint;
+            font-size: 11px;
+            margin-top: 2px;
+         }
+      }
+      .current-date-badge {
+         position: relative;
+         color: $accent;
+         opacity: 0.8;
+         .day-number {
+            position: absolute;
+            top: 58%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 11px;
+            font-weight: 800;
+         }
+      }
+   }
+
+   .card-middle {
+      .progress-info {
+         display: flex;
+         align-items: center;
+         gap: 6px;
+         font-size: 13px;
+         color: $text;
+         opacity: 0.9;
+         background: rgba($accent, 0.05);
+         padding: 6px 10px;
+         border-radius: 8px;
+      }
+   }
+
+   .card-footer {
+      border-top: 1px solid rgba($hint, 0.1);
+      padding-top: 10px;
+      .btn-schedule {
+         width: 100%;
+         background: none;
+         border: 1px dashed $accent;
+         color: $accent;
+         border-radius: 10px;
+         padding: 8px;
+         @include flex-center;
+         gap: 8px;
+         font-size: 13px;
+         font-weight: 500;
+      }
+   }
+}

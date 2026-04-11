@@ -1,14 +1,13 @@
 @use './styles/normalize';
 @use './styles/variables' as v; // Даем псевдоним v для удобства
 
-
-
-
-@use './App';
+@use './components/App/App.scss';
+@use './components/Contact/StudentModal.scss';
+@use './components/Contacts/StudentCard.scss';
 
 body {
-   background-color: v.$bg-color;
-   color: v.$text-color;
+   background-color: v.$bg;
+   color: v.$text;
    font-family:
       'Inter',
       -apple-system,

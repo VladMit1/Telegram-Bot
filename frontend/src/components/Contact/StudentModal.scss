@@ -1,0 +1,145 @@
+@use '../../styles/variables' as *; // Импортируем все переменные из variables.scss
+
+.modal-overlay {
+   position: fixed;
+   inset: 0;
+   background: rgba(0, 0, 0, 0.4);
+   z-index: 1000;
+   display: flex;
+   align-items: flex-end;
+}
+
+.student-modal {
+   width: 100%;
+   background: $bg;
+   border-radius: 24px 24px 0 0;
+   padding: 8px 16px 32px;
+
+   .modal-handle {
+      width: 40px;
+      height: 4px;
+      background: $hint;
+      opacity: 0.3;
+      border-radius: 2px;
+      margin: 0 auto 16px;
+   }
+
+   .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      .title {
+         display: flex;
+         align-items: center;
+         gap: 10px;
+         color: $accent;
+         h2 {
+            margin: 0;
+            font-size: 20px;
+         }
+      }
+      .close-btn {
+         background: $secondary-bg;
+         border: none;
+         border-radius: 50%;
+         padding: 4px;
+         color: $hint;
+      }
+   }
+
+   .activity-section {
+      margin-bottom: 24px;
+      h3 {
+         font-size: 14px;
+         color: $hint;
+         text-transform: uppercase;
+         margin-bottom: 12px;
+         letter-spacing: 0.5px;
+      }
+
+      .month-grid {
+         display: grid;
+         grid-template-columns: repeat(7, 1fr);
+         gap: 6px;
+         background: $secondary-bg;
+         padding: 10px;
+         border-radius: 12px;
+
+         .day-cell {
+            aspect-ratio: 1/1;
+            background: $bg;
+            border-radius: 6px;
+            @include flex-center;
+            font-size: 12px;
+            color: $hint;
+
+            &.attended {
+               background: $accent;
+               color: white;
+               font-weight: bold;
+            }
+            &.today {
+               border: 1.5px solid $accent;
+               color: $accent;
+            }
+         }
+      }
+   }
+
+   .progress-card {
+      background: $secondary-bg;
+      padding: 16px;
+      border-radius: $radius;
+      margin-bottom: 16px;
+      .label {
+         font-size: 11px;
+         color: $hint;
+         text-transform: uppercase;
+      }
+      h4 {
+         margin: 4px 0;
+         font-size: 17px;
+      }
+      p {
+         margin-bottom: 12px;
+         color: $hint;
+         font-size: 14px;
+      }
+      .btn-primary {
+         width: 100%;
+         background: $accent;
+         color: white;
+         border: none;
+         padding: 14px;
+         border-radius: 12px;
+         @include flex-center;
+         gap: 10px;
+         font-weight: 600;
+         font-size: 16px;
+      }
+   }
+
+   .stats-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      .stat-box {
+         background: $secondary-bg;
+         padding: 12px;
+         border-radius: 12px;
+         display: flex;
+         flex-direction: column;
+         align-items: center;
+         .num {
+            font-size: 18px;
+            font-weight: bold;
+            color: $text;
+         }
+         .txt {
+            font-size: 11px;
+            color: $hint;
+         }
+      }
+   }
+}

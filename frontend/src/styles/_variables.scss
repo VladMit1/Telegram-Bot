@@ -1,12 +1,13 @@
-// Цвета темы
-$bg-color: var(--tg-theme-bg-color, #ffffff);
-$secondary-bg: var(--tg-theme-secondary-bg-color, #f4f4f5);
-$text-color: var(--tg-theme-text-color, #000000);
-$hint-color: var(--tg-theme-hint-color, #999999);
-$link-color: var(--tg-theme-link-color, #248bed);
-$button-color: var(--tg-theme-button-color, #248bed);
-$button-text: var(--tg-theme-button-text-color, #ffffff);
+$bg: var(--tg-theme-bg-color, #ffffff);
+$secondary-bg: var(--tg-theme-secondary-bg-color, #f1f1f4);
+$text: var(--tg-theme-text-color, #000000);
+$hint: var(--tg-theme-hint-color, #999999);
+$accent: var(--tg-theme-button-color, #2481cc);
+$accent-text: var(--tg-theme-button-text-color, #ffffff);
+$radius: 16px;
 
-// Размеры
-$radius: 12px;
-$padding-base: 16px;
+@mixin flex-center {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+}
