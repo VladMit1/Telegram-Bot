@@ -4,6 +4,7 @@
 @use './components/App/App.scss';
 @use './components/Contact/StudentModal.scss';
 @use './components/Contacts/StudentCard.scss';
+@use './components/Calendar/Calendar.scss';
 
 body {
    background-color: v.$bg;

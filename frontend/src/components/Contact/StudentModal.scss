@@ -28,7 +28,6 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
       .title {
          display: flex;
          align-items: center;
@@ -49,39 +48,66 @@
    }
 
    .activity-section {
-      margin-bottom: 24px;
+      margin-top: 10px;
+
       h3 {
-         font-size: 14px;
-         color: $hint;
-         text-transform: uppercase;
-         margin-bottom: 12px;
-         letter-spacing: 0.5px;
+         font-size: 16px;
+         margin-bottom: 15px;
+         color: $text;
+         text-align: center;
+         text-transform: capitalize;
       }
 
-      .month-grid {
-         display: grid;
-         grid-template-columns: repeat(7, 1fr);
-         gap: 6px;
+      .calendar-wrapper {
          background: $secondary-bg;
-         padding: 10px;
-         border-radius: 12px;
+         padding: 12px;
+         border-radius: 16px;
+         margin-bottom: 8px;
 
-         .day-cell {
-            aspect-ratio: 1/1;
-            background: $bg;
-            border-radius: 6px;
-            @include flex-center;
-            font-size: 12px;
-            color: $hint;
+         .weekday-headers {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            margin-bottom: 8px;
 
-            &.attended {
-               background: $accent;
-               color: white;
+            span {
+               text-align: center;
+               font-size: 10px;
+               color: $hint;
                font-weight: bold;
+               text-transform: uppercase;
             }
-            &.today {
-               border: 1.5px solid $accent;
-               color: $accent;
+         }
+
+         .month-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr); // Ровно 7 колонок
+            gap: 6px;
+
+            .day-cell {
+               aspect-ratio: 1 / 1;
+               @include flex-center;
+               font-size: 13px;
+               border-radius: 8px;
+               background: $bg;
+               color: $hint;
+               transition: all 0.2s;
+
+               &.empty {
+                  background: transparent; // Пустые ячейки в начале месяца
+               }
+
+               &.attended {
+                  background: $accent;
+                  color: white;
+                  font-weight: bold;
+                  box-shadow: 0 2px 4px rgba($accent, 0.2);
+               }
+
+               &.today {
+                  border: 1.5px solid $accent;
+                  color: $accent;
+                  font-weight: 600;
+               }
             }
          }
       }

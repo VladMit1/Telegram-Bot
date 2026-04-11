@@ -1,0 +1,127 @@
+@use '../../styles/variables' as *; // Импортируем все переменные из variables.scss
+
+.event-calendar {
+   padding: 16px;
+   background: $bg;
+
+   .calendar-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      h2 {
+         font-size: 18px;
+         text-transform: capitalize;
+         margin: 0;
+      }
+      button {
+         background: $secondary-bg;
+         border: none;
+         border-radius: 50%;
+         padding: 5px;
+         color: $text;
+      }
+   }
+
+   .days-strip {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 24px;
+
+      .day-item {
+         display: flex;
+         flex-direction: column;
+         align-items: center;
+         padding: 10px;
+         border-radius: 12px;
+         min-width: 45px;
+         transition: all 0.2s;
+
+         .weekday {
+            font-size: 10px;
+            color: $hint;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+         }
+         .day-num {
+            font-size: 16px;
+            font-weight: bold;
+         }
+
+         &.active {
+            background: $accent;
+            color: white;
+            .weekday {
+               color: rgba(255, 255, 255, 0.7);
+            }
+         }
+      }
+   }
+
+   .event-list {
+      .list-header {
+         display: flex;
+         justify-content: space-between;
+         align-items: center;
+         margin-bottom: 16px;
+         span {
+            font-size: 14px;
+            font-weight: 600;
+            color: $hint;
+         }
+         .add-event-btn {
+            background: $accent;
+            color: white;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            @include flex-center;
+         }
+      }
+
+      .event-card {
+         background: $secondary-bg;
+         padding: 16px;
+         border-radius: 16px;
+         display: flex;
+         gap: 16px;
+         margin-bottom: 12px;
+         align-items: center;
+
+         .event-time {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: $accent;
+            font-weight: bold;
+            min-width: 60px;
+            border-right: 1px solid rgba($hint, 0.2);
+            padding-right: 12px;
+            small {
+               font-size: 9px;
+               color: $hint;
+               font-weight: normal;
+            }
+         }
+
+         .event-info {
+            flex: 1;
+            h4 {
+               margin: 0 0 4px;
+               font-size: 15px;
+            }
+            p {
+               margin: 0;
+               font-size: 12px;
+               color: $hint;
+            }
+         }
+
+         .event-action {
+            color: $hint;
+            opacity: 0.5;
+         }
+      }
+   }
+}

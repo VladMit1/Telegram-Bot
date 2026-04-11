@@ -10,6 +10,7 @@ import {
 
 import { StudentCard } from '../Contacts/StudentCard';
 import { StudentModal } from '../Contact/StudentModal';
+import { Calendar } from '../Calendar/Calendar';
 //import { Calendar } from './components/Calendar/Calendar';
 
 function App() {
@@ -87,7 +88,7 @@ function App() {
                      </div>
                   </motion.div>
                ) : (
-                  <div key="cal">Тут будет твой Календарь</div>
+                  <Calendar />
                )}
             </AnimatePresence>
          </main>

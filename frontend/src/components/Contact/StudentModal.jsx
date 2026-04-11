@@ -2,12 +2,22 @@ import { motion } from 'framer-motion';
 import { X, Play, BarChart, GraduationCap } from 'lucide-react';
 import moment from 'moment';
 export const StudentModal = ({ student, onClose }) => {
+   // 1. Настройки времени
+   const startOfMonth = moment().startOf('month');
    const daysInMonth = moment().daysInMonth();
-   const monthDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-   // Заглушка: даты занятий. В будущем придут из API как student.attended_days
-   const attendedDays = student.attended_days || [2, 5, 8, 12, 15, 19, 22];
+   // 2. Вычисляем смещение (0 = Пн, 1 = Вт ... 6 = Вс)
+   // isoWeekday() возвращает 1 для Пн. Вычитаем 1, чтобы получить индекс для массива.
+   const firstDayOffset = startOfMonth.isoWeekday() - 1;
 
+   // 3. Создаем массив ячеек: сначала пустые для смещения, потом числа месяца
+   const calendarCells = [
+      ...Array(firstDayOffset).fill(null),
+      ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+   ];
+
+   // Заглушка дат (потом заменим на student.attended_days)
+   const attendedDays = student.attended_days || [2, 5, 12, 19];
    return (
       <div className="modal-overlay" onClick={onClose}>
          <motion.div
@@ -32,16 +42,42 @@ export const StudentModal = ({ student, onClose }) => {
             <div className="modal-body">
                {/* Мини-календарь активности */}
                <section className="activity-section">
-                  <h3>Активность: {moment().format('MMMM')}</h3>
-                  <div className="month-grid">
-                     {monthDays.map((day) => (
-                        <div
-                           key={day}
-                           className={`day-cell ${attendedDays.includes(day) ? 'attended' : ''} ${day === moment().date() ? 'today' : ''}`}
-                        >
-                           {day}
-                        </div>
-                     ))}
+                  <div className="section-header">
+                     <h3>{moment().format('MMMM YYYY')}</h3>
+                  </div>
+
+                  <div className="calendar-wrapper">
+                     {/* Заголовки дней недели */}
+                     <div className="weekday-headers">
+                        {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => (
+                           <span key={d}>{d}</span>
+                        ))}
+                     </div>
+
+                     {/* Сетка дней */}
+                     <div className="month-grid">
+                        {calendarCells.map((day, i) => {
+                           if (day === null)
+                              return (
+                                 <div
+                                    key={`empty-${i}`}
+                                    className="day-cell empty"
+                                 />
+                              );
+
+                           const isAttended = attendedDays.includes(day);
+                           const isToday = day === moment().date();
+
+                           return (
+                              <div
+                                 key={day}
+                                 className={`day-cell ${isAttended ? 'attended' : ''} ${isToday ? 'today' : ''}`}
+                              >
+                                 {day}
+                              </div>
+                           );
+                        })}
+                     </div>
                   </div>
                </section>
 
