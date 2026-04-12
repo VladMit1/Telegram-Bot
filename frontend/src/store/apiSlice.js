@@ -7,10 +7,18 @@ export const apiSlice = createApi({
    }),
    tagTypes: ['Contacts', 'Events'],
    endpoints: (builder) => ({
+      // Теперь принимает month и year для фильтрации в БД
       getContacts: builder.query({
-         query: () => '/contacts',
+         query: (params) => ({
+            url: '/contacts',
+            params: {
+               month: params?.month, // Передаем 01, 02...
+               year: params?.year, // Передаем 2026...
+            },
+         }),
          providesTags: ['Contacts'],
       }),
+
       // Эндпоинт для обновления прогресса (книга/страница)
       updateProgress: builder.mutation({
          query: ({ id, ...patch }) => ({
@@ -18,9 +26,24 @@ export const apiSlice = createApi({
             method: 'PATCH',
             body: patch,
          }),
-         invalidatesTags: ['Contacts'], // Автоматически обновит список в App
+         invalidatesTags: ['Contacts'],
+      }),
+
+      // НОВЫЙ: Запись на урок (создание события в БД)
+      addLesson: builder.mutation({
+         query: (lessonData) => ({
+            url: '/lessons',
+            method: 'POST',
+            body: lessonData, // { student_id, date, time, topic }
+         }),
+         // Инвалидируем контакты, чтобы на календаре сразу появилась точка
+         invalidatesTags: ['Contacts', 'Events'],
       }),
    }),
 });
 
-export const { useGetContactsQuery, useUpdateProgressMutation } = apiSlice;
+export const {
+   useGetContactsQuery,
+   useUpdateProgressMutation,
+   useAddLessonMutation,
+} = apiSlice;

@@ -1,10 +1,19 @@
 import { motion } from 'framer-motion';
 import { X, Play, BarChart, GraduationCap } from 'lucide-react';
 import moment from 'moment';
+import { useState } from 'react';
 export const StudentModal = ({ student, onClose }) => {
    // 1. Настройки времени
-   const startOfMonth = moment().startOf('month');
-   const daysInMonth = moment().daysInMonth();
+   // Состояние для навигации по календарю
+   const [viewDate, setViewDate] = useState(moment());
+
+   // Вычисляем данные на основе viewDate, а не moment()
+   const daysInMonth = viewDate.daysInMonth();
+   const startOfMonth = viewDate.clone().startOf('month').isoWeekday(); // 1 - Пн, 7 - Вс
+
+   // Функции переключения
+   const prevMonth = () => setViewDate(viewDate.clone().subtract(1, 'month'));
+   const nextMonth = () => setViewDate(viewDate.clone().add(1, 'month'));
 
    // 2. Вычисляем смещение (0 = Пн, 1 = Вт ... 6 = Вс)
    // isoWeekday() возвращает 1 для Пн. Вычитаем 1, чтобы получить индекс для массива.
@@ -42,8 +51,17 @@ export const StudentModal = ({ student, onClose }) => {
             <div className="modal-body">
                {/* Мини-календарь активности */}
                <section className="activity-section">
-                  <div className="section-header">
-                     <h3>{moment().format('MMMM YYYY')}</h3>
+                  <div
+                     className="section-header"
+                     style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                     }}
+                  >
+                     <button onClick={prevMonth}>&lt;</button>
+                     <h3>{viewDate.format('MMMM YYYY')}</h3>
+                     <button onClick={nextMonth}>&gt;</button>
                   </div>
 
                   <div className="calendar-wrapper">
