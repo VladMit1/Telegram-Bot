@@ -13,7 +13,20 @@ export const StudentCard = ({ student, onOpen, onSchedule }) => {
       >
          <div className="card-top">
             <div className="avatar">
-               {student.name ? student.name.charAt(0).toUpperCase() : '?'}
+               {student.photo_url ? (
+                  <img
+                     src={student.photo_url}
+                     alt={student.name}
+                     style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                     }}
+                  />
+               ) : (
+                  student.name.charAt(0).toUpperCase()
+               )}
             </div>
 
             <div className="main-info">

@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import requests
 from datetime import datetime
 
 class DBManager:
@@ -96,19 +97,41 @@ class DBManager:
         except: return False
 
     # Метод для React API
-    def get_contacts_for_api(self):
+    def get_contacts_for_api(self, bot_token):
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 cursor.execute("SELECT * FROM contacts ORDER BY name ASC")
                 rows = cursor.fetchall()
+                
                 students = []
                 for row in rows:
+                    photo_url = None
+                    photo_id = row['photo_id']
+                    
+                    if photo_id:
+                        try:
+                            # Запрос к API Telegram для получения пути к файлу
+                            url = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={photo_id}"
+                            file_info = requests.get(url).json()
+                            if file_info.get('ok'):
+                                file_path = file_info['result']['file_path']
+                                photo_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
+                        except Exception as e:
+                            print(f"Ошибка получения фото для {row['name']}: {e}")
+
+                    # Получаем дни занятий
                     cursor.execute("SELECT DISTINCT strftime('%d', lesson_date) FROM lessons WHERE student_id = ?", (row['id'],))
                     days = [int(r[0]) for r in cursor.fetchall()]
-                    students.append({**dict(row), "attended_days": days})
+
+                    student_dict = dict(row)
+                    student_dict['photo_url'] = photo_url
+                    student_dict['attended_days'] = days
+                    students.append(student_dict)
                 return students
-        except: return []
+        except Exception as e:
+            print(f"Общая ошибка API контактов: {e}")
+            return []
 
 db = DBManager()

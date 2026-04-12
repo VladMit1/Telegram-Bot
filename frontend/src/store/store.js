@@ -1,4 +1,4 @@
-import { configureStore } from '@reduxjs/toolkit';
+import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
 import {
    persistStore,
@@ -10,21 +10,28 @@ import {
    PURGE,
    REGISTER,
 } from 'redux-persist';
+// Импортируем напрямую из lib, чтобы избежать проблем с default
 import storage from 'redux-persist/lib/storage';
 import { apiSlice } from './apiSlice';
-const baseStorage = storage.default ? storage.default : storage;
+
+// Проверка на default, чтобы getItem точно нашелся
+const actualStorage = storage.default ? storage.default : storage;
+
+// ВАЖНО: Мы создаем rootReducer, чтобы persist работал корректно с RTK Query
+const rootReducer = combineReducers({
+   [apiSlice.reducerPath]: apiSlice.reducer,
+});
+
 const persistConfig = {
    key: 'root',
-   storage: baseStorage,
-   whitelist: [apiSlice.reducerPath], // Сохраняем только кэш запросов
+   storage: actualStorage, // Теперь здесь точно объект с getItem/setItem
+   whitelist: [apiSlice.reducerPath],
 };
 
-const persistedReducer = persistReducer(persistConfig, apiSlice.reducer);
+const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 export const store = configureStore({
-   reducer: {
-      [apiSlice.reducerPath]: persistedReducer,
-   },
+   reducer: persistedReducer,
    middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
          serializableCheck: {
