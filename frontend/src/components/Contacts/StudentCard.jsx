@@ -16,6 +16,8 @@ export const StudentCard = ({ student, onOpen, onSchedule }) => {
                {student.photo_url ? (
                   <img
                      src={student.photo_url}
+                     referrerPolicy="no-referrer"
+                     loading='lazy'
                      alt={student.name}
                      style={{
                         width: '100%',
