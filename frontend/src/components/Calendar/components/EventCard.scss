@@ -1,0 +1,75 @@
+@use '../../../styles/variables' as *;
+
+.event-card {
+   background: $secondary-bg;
+   margin-bottom: 12px;
+   padding: 16px;
+   border-radius: 16px;
+   display: flex;
+   align-items: center;
+   gap: 16px;
+   position: relative;
+   overflow: hidden;
+   border: 1px solid rgba($hint, 0.1);
+
+   .status-indicator {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: $accent;
+   }
+
+   .event-time-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 55px;
+      border-right: 1px solid rgba($hint, 0.1);
+      padding-right: 12px;
+
+      .time {
+         font-size: 15px;
+         font-weight: bold;
+         color: $text;
+      }
+      .duration {
+         font-size: 10px;
+         color: $hint;
+      }
+   }
+
+   .event-main-info {
+      flex: 1;
+      .student-name {
+         display: flex;
+         align-items: center;
+         gap: 6px;
+         h4 {
+            margin: 0;
+            font-size: 15px;
+            color: $text;
+         }
+      }
+      .topic {
+         margin: 4px 0 0;
+         font-size: 13px;
+         color: $hint;
+      }
+   }
+
+   .details-button {
+      background: none;
+      border: none;
+      color: $hint;
+      padding: 0;
+   }
+}
+
+.empty-state {
+   text-align: center;
+   padding: 40px 0;
+   color: $hint;
+   font-size: 14px;
+}

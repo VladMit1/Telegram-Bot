@@ -9,7 +9,9 @@ class LessonSchema(BaseModel):
     date: str
     time: str
     topic: str = "Урок"
-
+class ProgressUpdate(BaseModel):
+    last_book: str = None
+    last_page: int = None
 @router.get("/contacts")
 def get_contacts():
     # Передаем токен, чтобы менеджер базы мог создать ссылки на фото
@@ -30,3 +32,15 @@ def create_lesson(data: LessonSchema):
         data.topic
     )
     return {"status": "ok" if success else "error"}    
+
+@router.patch("/contacts/{student_id}")
+def update_student_progress(student_id: int, data: ProgressUpdate):
+    # Метод в БД, который выполнит UPDATE contacts SET last_book = ?, last_page = ? WHERE id = ?
+    success = db.update_progress(
+        student_id, 
+        data.last_book, 
+        data.last_page
+    )
+    if success:
+        return {"status": "success"}
+    return {"status": "error"}, 400

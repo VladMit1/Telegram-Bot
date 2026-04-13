@@ -1,32 +1,9 @@
 import { motion } from 'framer-motion';
-import { X, Play, BarChart, GraduationCap } from 'lucide-react';
-import moment from 'moment';
-import { useState } from 'react';
+import { X, GraduationCap } from 'lucide-react';
+import { StudentCalendar } from './components/StudentCalendar';
+import { ProgressBlock } from './components/ProgressBlock';
+
 export const StudentModal = ({ student, onClose }) => {
-   // 1. Настройки времени
-   // Состояние для навигации по календарю
-   const [viewDate, setViewDate] = useState(moment());
-
-   // Вычисляем данные на основе viewDate, а не moment()
-   const daysInMonth = viewDate.daysInMonth();
-   const startOfMonth = viewDate.clone().startOf('month').isoWeekday(); // 1 - Пн, 7 - Вс
-
-   // Функции переключения
-   const prevMonth = () => setViewDate(viewDate.clone().subtract(1, 'month'));
-   const nextMonth = () => setViewDate(viewDate.clone().add(1, 'month'));
-
-   // 2. Вычисляем смещение (0 = Пн, 1 = Вт ... 6 = Вс)
-   // isoWeekday() возвращает 1 для Пн. Вычитаем 1, чтобы получить индекс для массива.
-   const firstDayOffset = startOfMonth.isoWeekday() - 1;
-
-   // 3. Создаем массив ячеек: сначала пустые для смещения, потом числа месяца
-   const calendarCells = [
-      ...Array(firstDayOffset).fill(null),
-      ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-   ];
-
-   // Заглушка дат (потом заменим на student.attended_days)
-   const attendedDays = student.attended_days || [2, 5, 12, 19];
    return (
       <div className="modal-overlay" onClick={onClose}>
          <motion.div
@@ -49,69 +26,9 @@ export const StudentModal = ({ student, onClose }) => {
             </header>
 
             <div className="modal-body">
-               {/* Мини-календарь активности */}
-               <section className="activity-section">
-                  <div
-                     className="section-header"
-                     style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                     }}
-                  >
-                     <button onClick={prevMonth}>&lt;</button>
-                     <h3>{viewDate.format('MMMM YYYY')}</h3>
-                     <button onClick={nextMonth}>&gt;</button>
-                  </div>
+               <StudentCalendar attendedDays={student.attended_days || []} />
 
-                  <div className="calendar-wrapper">
-                     {/* Заголовки дней недели */}
-                     <div className="weekday-headers">
-                        {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => (
-                           <span key={d}>{d}</span>
-                        ))}
-                     </div>
-
-                     {/* Сетка дней */}
-                     <div className="month-grid">
-                        {calendarCells.map((day, i) => {
-                           if (day === null)
-                              return (
-                                 <div
-                                    key={`empty-${i}`}
-                                    className="day-cell empty"
-                                 />
-                              );
-
-                           const isAttended = attendedDays.includes(day);
-                           const isToday = day === moment().date();
-
-                           return (
-                              <div
-                                 key={day}
-                                 className={`day-cell ${isAttended ? 'attended' : ''} ${isToday ? 'today' : ''}`}
-                              >
-                                 {day}
-                              </div>
-                           );
-                        })}
-                     </div>
-                  </div>
-               </section>
-
-               <div className="progress-card">
-                  <div className="book-detail">
-                     <span className="label">Текущий материал</span>
-                     <h4>{student.last_book || 'Книга не назначена'}</h4>
-                     <p>
-                        Страница: <strong>{student.last_page || 0}</strong>
-                     </p>
-                  </div>
-                  <button className="btn-primary">
-                     <Play size={18} fill="currentColor" />
-                     <span>Продолжить урок</span>
-                  </button>
-               </div>
+               <ProgressBlock student={student} />
 
                <div className="stats-row">
                   <div className="stat-box">

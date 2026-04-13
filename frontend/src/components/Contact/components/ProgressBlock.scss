@@ -1,0 +1,89 @@
+@use '../../../styles/variables' as *;
+
+.progress-card {
+   background: $secondary-bg;
+   padding: 16px;
+   border-radius: $radius;
+   margin: 16px 0;
+
+   .label {
+      font-size: 11px;
+      color: $hint;
+      text-transform: uppercase;
+   }
+
+   h4 {
+      margin: 4px 0;
+      font-size: 17px;
+      color: $text;
+   }
+   p {
+      margin-bottom: 12px;
+      color: $hint;
+      font-size: 14px;
+   }
+
+   .edit-box {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+
+      input {
+         background: $bg;
+         border: 1px solid rgba($hint, 0.2);
+         border-radius: 8px;
+         color: $text;
+         padding: 10px;
+         font-size: 16px;
+         width: 100%;
+
+         &:focus {
+            border-color: $accent;
+            outline: none;
+         }
+      }
+
+      .page-input {
+         width: 100px;
+      }
+
+      .edit-btns {
+         display: flex;
+         gap: 8px;
+
+         button {
+            flex: 1;
+            padding: 8px;
+            border-radius: 8px;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+
+            &.save-btn {
+               background: $accent;
+               color: white;
+            }
+            &.cancel-btn {
+               background: rgba($hint, 0.1);
+               color: $hint;
+            }
+         }
+      }
+   }
+
+   .btn-primary {
+      width: 100%;
+      background: $accent;
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 600;
+   }
+}

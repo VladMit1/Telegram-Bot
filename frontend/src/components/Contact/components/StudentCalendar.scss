@@ -1,0 +1,80 @@
+@use '../../../styles/variables' as *;
+
+.activity-section {
+   margin-top: 10px;
+
+   .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+
+      h3 {
+         font-size: 16px;
+         margin: 0;
+         color: $text;
+         text-transform: capitalize;
+      }
+
+      button {
+         background: none;
+         border: none;
+         color: $accent;
+         font-size: 20px;
+         cursor: pointer;
+      }
+   }
+
+   .calendar-wrapper {
+      background: $secondary-bg;
+      min-height: 280px;
+      padding: 12px;
+      border-radius: 16px;
+
+      .weekday-headers {
+         display: grid;
+         grid-template-columns: repeat(7, 1fr);
+         margin-bottom: 8px;
+
+         span {
+            text-align: center;
+            font-size: 10px;
+            color: $hint;
+            font-weight: bold;
+            text-transform: uppercase;
+         }
+      }
+
+      .month-grid {
+         display: grid;
+         grid-template-columns: repeat(7, 1fr);
+         gap: 8px;
+
+         .day-cell {
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            border-radius: 8px;
+            background: $bg;
+            color: $hint;
+
+            &.attended {
+               background: $accent;
+               color: white;
+               font-weight: bold;
+            }
+
+            &.today {
+               border: 1.5px solid $accent;
+               color: $accent;
+            }
+
+            &.empty {
+               background: transparent;
+            }
+         }
+      }
+   }
+}

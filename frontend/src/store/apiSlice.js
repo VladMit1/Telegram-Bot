@@ -6,6 +6,7 @@ export const apiSlice = createApi({
       baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
    }),
    tagTypes: ['Contacts', 'Events'],
+   keepUnusedDataFor: 900,
    endpoints: (builder) => ({
       // Теперь принимает month и year для фильтрации в БД
       getContacts: builder.query({

@@ -26,6 +26,8 @@ const persistConfig = {
    key: 'root',
    storage: actualStorage, // Теперь здесь точно объект с getItem/setItem
    whitelist: [apiSlice.reducerPath],
+   timeout: 1000,
+   throttle: 500,
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

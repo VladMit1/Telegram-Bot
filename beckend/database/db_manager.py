@@ -133,5 +133,16 @@ class DBManager:
         except Exception as e:
             print(f"Общая ошибка API контактов: {e}")
             return []
+        
+    def update_progress(self, student_id, last_book, last_page):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE contacts SET last_book = ?, last_page = ? WHERE id = ?", (last_book, last_page, student_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Ошибка при обновлении прогресса: {e}")
+            return False
 
 db = DBManager()

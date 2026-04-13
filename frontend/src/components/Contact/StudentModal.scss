@@ -1,9 +1,13 @@
-@use '../../styles/variables' as *; // Импортируем все переменные из variables.scss
+@use '../../styles/variables' as *;
+
+// Импортируем стили подкомпонентов
+@use './components/StudentCalendar.scss';
+@use './components/ProgressBlock.scss';
 
 .modal-overlay {
    position: fixed;
    inset: 0;
-   background: rgba(0, 0, 0, 0.4);
+   background: rgba(0, 0, 0, 0.6);
    z-index: 1000;
    display: flex;
    align-items: flex-end;
@@ -14,12 +18,14 @@
    background: $bg;
    border-radius: 24px 24px 0 0;
    padding: 8px 16px 32px;
+   max-height: 95vh;
+   overflow-y: auto;
 
    .modal-handle {
       width: 40px;
       height: 4px;
       background: $hint;
-      opacity: 0.3;
+      opacity: 0.2;
       border-radius: 2px;
       margin: 0 auto 16px;
    }
@@ -28,6 +34,8 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      margin-bottom: 10px;
+
       .title {
          display: flex;
          align-items: center;
@@ -36,113 +44,17 @@
          h2 {
             margin: 0;
             font-size: 20px;
+            color: $text;
          }
       }
+
       .close-btn {
          background: $secondary-bg;
          border: none;
          border-radius: 50%;
-         padding: 4px;
+         padding: 6px;
          color: $hint;
-      }
-   }
-
-   .activity-section {
-      margin-top: 10px;
-
-      h3 {
-         font-size: 16px;
-         margin-bottom: 15px;
-         color: $text;
-         text-align: center;
-         text-transform: capitalize;
-      }
-
-      .calendar-wrapper {
-         background: $secondary-bg;
-         padding: 12px;
-         border-radius: 16px;
-         margin-bottom: 8px;
-
-         .weekday-headers {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            margin-bottom: 8px;
-
-            span {
-               text-align: center;
-               font-size: 10px;
-               color: $hint;
-               font-weight: bold;
-               text-transform: uppercase;
-            }
-         }
-
-         .month-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr); // Ровно 7 колонок
-            gap: 6px;
-
-            .day-cell {
-               aspect-ratio: 1 / 1;
-               @include flex-center;
-               font-size: 13px;
-               border-radius: 8px;
-               background: $bg;
-               color: $hint;
-               transition: all 0.2s;
-
-               &.empty {
-                  background: transparent; // Пустые ячейки в начале месяца
-               }
-
-               &.attended {
-                  background: $accent;
-                  color: white;
-                  font-weight: bold;
-                  box-shadow: 0 2px 4px rgba($accent, 0.2);
-               }
-
-               &.today {
-                  border: 1.5px solid $accent;
-                  color: $accent;
-                  font-weight: 600;
-               }
-            }
-         }
-      }
-   }
-
-   .progress-card {
-      background: $secondary-bg;
-      padding: 16px;
-      border-radius: $radius;
-      margin-bottom: 16px;
-      .label {
-         font-size: 11px;
-         color: $hint;
-         text-transform: uppercase;
-      }
-      h4 {
-         margin: 4px 0;
-         font-size: 17px;
-      }
-      p {
-         margin-bottom: 12px;
-         color: $hint;
-         font-size: 14px;
-      }
-      .btn-primary {
-         width: 100%;
-         background: $accent;
-         color: white;
-         border: none;
-         padding: 14px;
-         border-radius: 12px;
-         @include flex-center;
-         gap: 10px;
-         font-weight: 600;
-         font-size: 16px;
+         cursor: pointer;
       }
    }
 
@@ -150,6 +62,7 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 12px;
+
       .stat-box {
          background: $secondary-bg;
          padding: 12px;
@@ -157,6 +70,7 @@
          display: flex;
          flex-direction: column;
          align-items: center;
+
          .num {
             font-size: 18px;
             font-weight: bold;
