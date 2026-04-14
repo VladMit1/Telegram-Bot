@@ -40,6 +40,11 @@ export const apiSlice = createApi({
          // Инвалидируем контакты, чтобы на календаре сразу появилась точка
          invalidatesTags: ['Contacts', 'Events'],
       }),
+      // Внутри createApi -> endpoints
+      getLessons: builder.query({
+         query: () => '/lessons',
+         providesTags: ['Lessons'], // Важно для авто-обновления после добавления
+      }),
    }),
 });
 
@@ -47,4 +52,5 @@ export const {
    useGetContactsQuery,
    useUpdateProgressMutation,
    useAddLessonMutation,
+   useGetLessonsQuery,
 } = apiSlice;

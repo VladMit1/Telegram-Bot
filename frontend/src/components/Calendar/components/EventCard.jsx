@@ -1,6 +1,7 @@
 import { ChevronRight } from 'lucide-react';
 
 export const EventCard = ({ event }) => {
+   console.log("🚀 ~ EventCard ~ event:", event)
    return (
       <div className="event-card">
          <div className="status-indicator" />

@@ -9,6 +9,8 @@ class LessonSchema(BaseModel):
     date: str
     time: str
     topic: str = "Урок"
+    duration: int
+
 class ProgressUpdate(BaseModel):
     last_book: str = None
     last_page: int = None
@@ -29,7 +31,8 @@ def create_lesson(data: LessonSchema):
         data.student_id, 
         data.date, 
         data.time, 
-        data.topic
+        data.topic,
+        data.duration
     )
     return {"status": "ok" if success else "error"}    
 
@@ -44,3 +47,7 @@ def update_student_progress(student_id: int, data: ProgressUpdate):
     if success:
         return {"status": "success"}
     return {"status": "error"}, 400
+
+@router.get("/lessons")
+def read_lessons():
+    return db.get_all_lessons()

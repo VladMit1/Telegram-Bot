@@ -35,7 +35,7 @@ class DBManager:
                         lesson_date DATE,
                         lesson_time TEXT,
                         topic TEXT,
-                        duration INTEGER DEFAULT 60,
+                        duration INTEGER,
                         FOREIGN KEY (student_id) REFERENCES contacts (id)
                     )
                 ''')
@@ -144,5 +144,29 @@ class DBManager:
         except Exception as e:
             print(f"Ошибка при обновлении прогресса: {e}")
             return False
+    def add_lesson(self, student_id, date, time, topic, duration):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO lessons (student_id, lesson_date, lesson_time, topic, duration)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (student_id, date, time, topic, duration))
+                conn.commit()
+                return cursor.lastrowid # Возвращаем ID нового урока
+        except sqlite3.Error as e:
+            print(f"Ошибка БД: {e}")
+            return None
+    def get_all_lessons(self):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row # Чтобы получить словарь
+            cursor = conn.cursor()
+        # Соединяем с таблицей контактов, чтобы получить имя
+            cursor.execute('''
+            SELECT l.*, c.name as student_name 
+            FROM lessons l
+            JOIN contacts c ON l.student_id = c.id
+        ''')
+            return [dict(row) for row in cursor.fetchall()]
 
 db = DBManager()

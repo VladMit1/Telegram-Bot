@@ -7,16 +7,15 @@ import {
    Calendar as CalendarIcon,
    Search,
 } from 'lucide-react';
-
 import { StudentCard } from '../Contacts/StudentCard';
 import { StudentModal } from '../Contact/StudentModal';
 import { Calendar } from '../Calendar/Calendar';
-//import { Calendar } from './components/Calendar/Calendar';
 
 function App() {
    const [view, setView] = useState('list');
    const [searchQuery, setSearchQuery] = useState('');
    const [selectedStudent, setSelectedStudent] = useState(null);
+   const [calendarContext, setCalendarContext] = useState(null);
 
    const {
       data: contacts = [],
@@ -24,11 +23,11 @@ function App() {
       isFetching,
       refetch,
    } = useGetContactsQuery();
-      console.log("🚀 ~ App ~ contacts:", contacts)
 
-   const filteredContacts = contacts.filter((c) =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase())
-   );
+   const navigateToCalendar = (student = null) => {
+      setCalendarContext(student);
+      setView('calendar');
+   };
 
    return (
       <div className="app-container">
@@ -38,15 +37,13 @@ function App() {
                   className={view === 'list' ? 'active' : ''}
                   onClick={() => setView('list')}
                >
-                  <Users size={20} />
-                  <span>Ученики</span>
+                  <Users size={20} /> <span>Ученики</span>
                </button>
                <button
                   className={view === 'calendar' ? 'active' : ''}
-                  onClick={() => setView('calendar')}
+                  onClick={() => navigateToCalendar(null)}
                >
-                  <CalendarIcon size={20} />
-                  <span>График</span>
+                  <CalendarIcon size={20} /> <span>График</span>
                </button>
             </div>
             <button
@@ -62,13 +59,14 @@ function App() {
                {view === 'list' ? (
                   <motion.div
                      key="list"
-                     initial={{ opacity: 0 }}
-                     animate={{ opacity: 1 }}
+                     initial={{ opacity: 0, x: -10 }}
+                     animate={{ opacity: 1, x: 0 }}
+                     exit={{ opacity: 0, x: 10 }}
                   >
                      <div className="search-wrapper">
                         <Search className="search-icon" size={18} />
                         <input
-                           placeholder="Поиск ученика..."
+                           placeholder="Поиск..."
                            value={searchQuery}
                            onChange={(e) => setSearchQuery(e.target.value)}
                         />
@@ -77,19 +75,35 @@ function App() {
                         {isLoading ? (
                            <p>Загрузка...</p>
                         ) : (
-                           filteredContacts.map((s) => (
-                              <StudentCard
-                                 key={s.id}
-                                 student={s}
-                                 onOpen={setSelectedStudent}
-                                 onSchedule={() => setView('calendar')}
-                              />
-                           ))
+                           contacts
+                              .filter((c) =>
+                                 c.name
+                                    .toLowerCase()
+                                    .includes(searchQuery.toLowerCase())
+                              )
+                              .map((s) => (
+                                 <StudentCard
+                                    key={s.id}
+                                    student={s}
+                                    onOpen={() => setSelectedStudent(s)}
+                                    onSchedule={() => navigateToCalendar(s)}
+                                 />
+                              ))
                         )}
                      </div>
                   </motion.div>
                ) : (
-                  <Calendar />
+                  <motion.div
+                     key="calendar"
+                     initial={{ opacity: 0, x: 10 }}
+                     animate={{ opacity: 1, x: 0 }}
+                     exit={{ opacity: 0, x: -10 }}
+                  >
+                     <Calendar
+                        initialStudent={calendarContext}
+                        onContextClear={() => setCalendarContext(null)}
+                     />
+                  </motion.div>
                )}
             </AnimatePresence>
          </main>
@@ -99,6 +113,11 @@ function App() {
                <StudentModal
                   student={selectedStudent}
                   onClose={() => setSelectedStudent(null)}
+                  onSchedule={() => {
+                     const s = selectedStudent;
+                     setSelectedStudent(null);
+                     navigateToCalendar(s);
+                  }}
                />
             )}
          </AnimatePresence>

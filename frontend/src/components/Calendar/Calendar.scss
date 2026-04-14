@@ -2,6 +2,7 @@
 @use './components/WeekView.scss';
 @use './components/MonthView.scss';
 @use './components/EventCard.scss';
+@use './components/AddEventModal.scss';
 .calendar-screen {
    padding: 16px;
    color: $text;
