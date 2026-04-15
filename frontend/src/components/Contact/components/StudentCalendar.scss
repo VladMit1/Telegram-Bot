@@ -68,7 +68,18 @@
 
             &.today {
                border: 1.5px solid $accent;
-               color: $accent;
+               color: $accent; /* Или твой $accent */
+               font-weight: bold;
+               position: relative;
+            }
+            &.today::after {
+               content: '';
+               position: absolute;
+               bottom: 4px;
+               width: 4px;
+               height: 4px;
+               background: currentColor;
+               border-radius: 50%;
             }
 
             &.empty {

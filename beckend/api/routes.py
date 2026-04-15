@@ -51,3 +51,14 @@ def update_student_progress(student_id: int, data: ProgressUpdate):
 @router.get("/lessons")
 def read_lessons():
     return db.get_all_lessons()
+
+@router.delete("/lessons/{lesson_id}")
+def delete_lesson(lesson_id: int):
+    success = db.delete_lesson(lesson_id) # Реализуй этот метод в DBManager (DELETE FROM lessons WHERE id=?)
+    return {"status": "ok" if success else "error"}
+
+@router.patch("/lessons/{lesson_id}")
+def update_lesson(lesson_id: int, data: dict):
+    # Метод для переноса даты или времени
+    success = db.update_lesson(lesson_id, data) 
+    return {"status": "ok"}

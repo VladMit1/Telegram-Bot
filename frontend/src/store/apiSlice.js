@@ -38,12 +38,27 @@ export const apiSlice = createApi({
             body: lessonData, // { student_id, date, time, topic }
          }),
          // Инвалидируем контакты, чтобы на календаре сразу появилась точка
-         invalidatesTags: ['Contacts', 'Events'],
+         invalidatesTags: ['Contacts', 'Lessons'],
       }),
       // Внутри createApi -> endpoints
       getLessons: builder.query({
          query: () => '/lessons',
          providesTags: ['Lessons'], // Важно для авто-обновления после добавления
+      }),
+      deleteLesson: builder.mutation({
+         query: (id) => ({
+            url: `/lessons/${id}`,
+            method: 'DELETE',
+         }),
+         invalidatesTags: ['Lessons'],
+      }),
+      updateLesson: builder.mutation({
+         query: ({ id, ...patch }) => ({
+            url: `/lessons/${id}`,
+            method: 'PATCH',
+            body: patch,
+         }),
+         invalidatesTags: ['Lessons'],
       }),
    }),
 });
@@ -53,4 +68,6 @@ export const {
    useUpdateProgressMutation,
    useAddLessonMutation,
    useGetLessonsQuery,
+   useDeleteLessonMutation,
+   useUpdateLessonMutation,
 } = apiSlice;

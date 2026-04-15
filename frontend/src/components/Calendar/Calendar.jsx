@@ -6,7 +6,7 @@ import { WeekView } from './components/WeekView';
 import { MonthView } from './components/MonthView';
 import { EventCard } from './components/EventCard';
 import { AddEventModal } from './components/AddEventModal';
-import './Calendar.scss';
+
 import { useGetLessonsQuery } from '../../store/apiSlice';
 
 export const Calendar = ({ initialStudent, onContextClear }) => {
@@ -14,14 +14,24 @@ export const Calendar = ({ initialStudent, onContextClear }) => {
    const [viewMode, setViewMode] = useState('week');
    const [modalAddOpen, setModalAddOpen] = useState(false);
    const [pendingStudent, setPendingStudent] = useState(initialStudent);
-
+   const [editingEvent, setEditingEvent] = useState(null);
+   // Внутри компонента Calendar
    const { data: allLessons = [], isLoading } = useGetLessonsQuery();
+
    const dailyEvents = useMemo(() => {
-      const dateStr = selectedDate.format('YYYY-MM-DD');
-      return allLessons
-         .filter((lesson) => lesson.lesson_date === dateStr)
-         .sort((a, b) => a.lesson_time.localeCompare(b.lesson_time)); // Сортировка по времени
-   }, [allLessons, selectedDate]);
+      // 1. Форматируем выбранную дату в календаре в строку ISO
+      const selectedStr = selectedDate.format('YYYY-MM-DD');
+
+      console.log('Фильтруем для даты:', selectedStr);
+
+      // 2. Фильтруем массив из базы
+      return allLessons.filter((lesson) => {
+         // Ключ lesson.lesson_date должен СТРОГО совпадать по формату (2026-04-15)
+         const lessonDate = String(lesson.lesson_date || lesson.date).trim();
+         return lessonDate === selectedStr;
+      });
+   }, [allLessons, selectedDate]); // Массив пересчитается при каждом клике по календарю
+
    const handleDateSelect = (date) => {
       setSelectedDate(date);
       if (pendingStudent) {
@@ -34,7 +44,10 @@ export const Calendar = ({ initialStudent, onContextClear }) => {
       setPendingStudent(null);
       onContextClear();
    };
-
+   const handleEditClick = (event) => {
+      setEditingEvent(event);
+      setModalAddOpen(true);
+   };
    return (
       <div className="calendar-screen">
          <AnimatePresence>
@@ -124,7 +137,7 @@ export const Calendar = ({ initialStudent, onContextClear }) => {
                <MonthView
                   selectedDate={selectedDate}
                   onSelect={handleDateSelect}
-                  events={[]}
+                  events={allLessons}
                />
             )}
          </div>
@@ -159,6 +172,7 @@ export const Calendar = ({ initialStudent, onContextClear }) => {
                            student: event.student_name || 'Ученик', // Предполагая, что бэк вернет имя
                            duration: `${event.duration} мин`,
                         }}
+                        onEdit={() => handleEditClick(event)}
                      />
                   ))
                ) : (
@@ -174,6 +188,7 @@ export const Calendar = ({ initialStudent, onContextClear }) => {
                onClose={handleCloseModal}
                selectedDate={selectedDate}
                initialStudent={pendingStudent}
+               editingEvent={editingEvent}
             />
          )}
       </div>

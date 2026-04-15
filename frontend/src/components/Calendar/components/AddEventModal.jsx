@@ -2,16 +2,22 @@ import { useState } from 'react';
 import {
    useGetContactsQuery,
    useAddLessonMutation,
+   useUpdateLessonMutation,
 } from '../../../store/apiSlice';
 
-export const AddEventModal = ({ onClose, selectedDate, initialStudent }) => {
+export const AddEventModal = ({
+   onClose,
+   selectedDate,
+   initialStudent,
+   editingEvent,
+}) => {
    // Загружаем контакты только если ученик не передан заранее
    const { data: contacts = [] } = useGetContactsQuery(undefined, {
       skip: !!initialStudent,
    });
 
    const [addLesson, { isLoading }] = useAddLessonMutation();
-
+   const [updateLesson] = useUpdateLessonMutation();
    const [formData, setFormData] = useState({
       student_id: initialStudent?.id || '',
       time: '12:00', // Стандарт HH:mm
@@ -23,20 +29,25 @@ export const AddEventModal = ({ onClose, selectedDate, initialStudent }) => {
       if (!formData.student_id) return alert('Выберите ученика');
 
       try {
-         await addLesson({
+         const payload = {
             ...formData,
             date: selectedDate.format('YYYY-MM-DD'),
-         }).unwrap();
+            student_id: initialStudent?.id || formData.student_id,
+         };
 
-         // Уведомление для Telegram
-         window.Telegram?.WebApp?.HapticFeedback.notificationOccurred(
-            'success'
-         );
+         if (editingEvent) {
+            // Если редактируем
+            await updateLesson({ id: editingEvent.id, ...payload }).unwrap();
+         } else {
+            // Если новый
+            await addLesson(payload).unwrap();
+         }
          onClose();
       } catch (err) {
          console.error('Ошибка:', err);
       }
    };
+
    const hours = Array.from({ length: 24 }, (_, i) =>
       i.toString().padStart(2, '0')
    );

@@ -1,32 +1,31 @@
 import moment from 'moment';
 import { useState } from 'react';
 
-export const StudentCalendar = ({ attendedDays }) => {
+export const StudentCalendar = ({ attendedDays = [] }) => {
    const [viewDate, setViewDate] = useState(moment());
 
    const daysInMonth = viewDate.daysInMonth();
    const firstDayWeekday = viewDate.clone().startOf('month').isoWeekday();
    const firstDayOffset = firstDayWeekday - 1;
 
-   const calendarCells = [
-      ...Array(firstDayOffset).fill(null),
-      ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-   ];
-
-   const finalCalendarCells = [
-      ...calendarCells,
-      ...Array(42 - calendarCells.length).fill(null),
-   ];
-
    const prevMonth = () => setViewDate(viewDate.clone().subtract(1, 'month'));
    const nextMonth = () => setViewDate(viewDate.clone().add(1, 'month'));
+
+   const cells = [];
+   for (let i = 0; i < firstDayOffset; i++) cells.push(null);
+   for (let i = 1; i <= daysInMonth; i++) cells.push(i);
+   while (cells.length < 42) cells.push(null);
 
    return (
       <section className="activity-section">
          <div className="section-header">
-            <button onClick={prevMonth}>&lt;</button>
+            <button className="nav-btn" onClick={prevMonth}>
+               &lt;
+            </button>
             <h3>{viewDate.format('MMMM YYYY')}</h3>
-            <button onClick={nextMonth}>&gt;</button>
+            <button className="nav-btn" onClick={nextMonth}>
+               &gt;
+            </button>
          </div>
 
          <div className="calendar-wrapper">
@@ -36,24 +35,43 @@ export const StudentCalendar = ({ attendedDays }) => {
                ))}
             </div>
             <div className="month-grid">
-               {finalCalendarCells.map((day, i) => {
+               {cells.map((day, i) => {
                   if (day === null)
                      return (
                         <div key={`empty-${i}`} className="day-cell empty" />
                      );
 
-                  const isAttended = attendedDays.includes(day);
-                  const isToday =
-                     viewDate.isSame(moment(), 'month') &&
-                     viewDate.isSame(moment(), 'year') &&
-                     day === moment().date();
+                  // Генерируем строку даты для текущей ячейки
+                  const currentFullDate = viewDate
+                     .clone()
+                     .date(day)
+                     .format('YYYY-MM-DD');
+
+                  // Ищем объект урока, который соответствует этой дате
+                  const lessonInfo = attendedDays.find(
+                     (d) => d.date === currentFullDate
+                  );
+
+                  const isToday = moment().isSame(
+                     viewDate.clone().date(day),
+                     'day'
+                  );
 
                   return (
                      <div
-                        key={day}
-                        className={`day-cell ${isAttended ? 'attended' : ''} ${isToday ? 'today' : ''}`}
+                        key={currentFullDate}
+                        className={
+                           `day-cell 
+                           ${lessonInfo ? 'attended' : ''} 
+                           ${isToday ? 'today' : ''} 
+                           ${lessonInfo?.status || ''}` // Добавляем класс статуса (planned/completed)
+                        }
+                        onClick={() =>
+                           lessonInfo && alert(`Тема: ${lessonInfo.topic}`)
+                        }
                      >
-                        {day}
+                        <span className="day-number">{day}</span>
+                        {lessonInfo && <div className="status-dot" />}
                      </div>
                   );
                })}

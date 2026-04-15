@@ -156,17 +156,17 @@ class DBManager:
                 return cursor.lastrowid # Возвращаем ID нового урока
         except sqlite3.Error as e:
             print(f"Ошибка БД: {e}")
-            return None
+            return NoneS
     def get_all_lessons(self):
         with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row # Чтобы получить словарь
+            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-        # Соединяем с таблицей контактов, чтобы получить имя
+        # Тянем всё из уроков + имя из контактов
             cursor.execute('''
-            SELECT l.*, c.name as student_name 
-            FROM lessons l
-            JOIN contacts c ON l.student_id = c.id
-        ''')
+                SELECT lessons.*, contacts.name as student_name 
+                FROM lessons 
+                JOIN contacts ON lessons.student_id = contacts.id
+            ''')
             return [dict(row) for row in cursor.fetchall()]
 
 db = DBManager()

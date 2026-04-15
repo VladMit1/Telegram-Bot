@@ -25,7 +25,7 @@ export const MonthView = ({ selectedDate, onSelect, events }) => {
                const isSelected = day.isSame(selectedDate, 'day');
                const isCurrentMonth = day.isSame(selectedDate, 'month');
                const hasEvents = events.some(
-                  (e) => e.date === day.format('YYYY-MM-DD')
+                  (e) => e.lesson_date === day.format('YYYY-MM-DD')
                );
                const isToday = day.isSame(moment(), 'day');
                return (
