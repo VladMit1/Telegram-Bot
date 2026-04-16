@@ -1,16 +1,24 @@
 import moment from 'moment';
 import { useState } from 'react';
 
-export const StudentCalendar = ({ attendedDays = [] }) => {
-   const [viewDate, setViewDate] = useState(moment());
-
+export const StudentCalendar = ({
+   attendedDays = [],
+   viewDate,
+   setViewDate,
+}) => {
    const daysInMonth = viewDate.daysInMonth();
    const firstDayWeekday = viewDate.clone().startOf('month').isoWeekday();
    const firstDayOffset = firstDayWeekday - 1;
 
-   const prevMonth = () => setViewDate(viewDate.clone().subtract(1, 'month'));
-   const nextMonth = () => setViewDate(viewDate.clone().add(1, 'month'));
+   const prevMonth = (e) => {
+      e.stopPropagation(); // Останавливаем закрытие модалки
+      setViewDate(viewDate.clone().subtract(1, 'month'));
+   };
 
+   const nextMonth = (e) => {
+      e.stopPropagation(); // Останавливаем закрытие модалки
+      setViewDate(viewDate.clone().add(1, 'month'));
+   };
    const cells = [];
    for (let i = 0; i < firstDayOffset; i++) cells.push(null);
    for (let i = 1; i <= daysInMonth; i++) cells.push(i);
