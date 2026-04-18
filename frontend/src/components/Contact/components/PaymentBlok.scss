@@ -27,12 +27,30 @@
          transition: transform 0.2s ease;
 
          .num {
-            font-size: 18px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-            margin-bottom: 4px;
+            transition: color 0.3s ease;
+
+            // Цвета через классы
+            &.positive {
+               color: $success;
+            }
+
+            &.negative {
+               color: $danger;
+            }
+
+            &.warning {
+               color: $warning;
+            }
+         }
+         &:has(.warning) {
+            background: rgba($warning, 0.05);
+            border-color: rgba($warning, 0.2);
          }
 
+         &:has(.negative) {
+            background: rgba($danger, 0.05);
+            border-color: rgba($danger, 0.2);
+         }
          .txt {
             font-size: 10px;
             text-transform: uppercase;

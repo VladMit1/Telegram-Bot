@@ -26,13 +26,23 @@ export const PaymentBlock = ({ student, studentHistory }) => {
    // 2. Актуальный баланс (Оплаты минус только совершенные уроки)
    const currentBalance =
       student.total_paid - conductedLessons.length * student.lesson_price;
-
-   // 3. Запас уроков (сколько еще можно провести на текущий депозит)
-   const lessonsLeft = Math.floor(currentBalance / student.lesson_price);
-   // 4. Будущие уроки (просто для инфо, если захочешь вывести)
+   // 3. Будущие уроки
    const futureLessonsCount = studentHistory.filter(
       (h) => h.type === 'lesson' && h.date > todayStr
    ).length;
+
+   // 4. Определение цвета баланса
+   const getBalanceClass = () => {
+      if (currentBalance < 0) return 'negative';
+      if (currentBalance < student.lesson_price && futureLessonsCount > 0)
+         return 'warning';
+      return 'positive';
+   };
+
+   const balanceClass = getBalanceClass();
+   // 3. Запас уроков (сколько еще можно провести на текущий депозит)
+   const lessonsLeft = Math.floor(currentBalance / student.lesson_price);
+
    const handleConfirmPayment = async () => {
       try {
          await createPayment({
@@ -60,20 +70,14 @@ export const PaymentBlock = ({ student, studentHistory }) => {
       <div className="payment-block">
          <div className="stats-row">
             <div className="stat-box">
-               <span
-                  className="num"
-                  style={{
-                     color: currentBalance < 0 ? '#ff4d4f' : '#52c41a',
-                  }}
-               >
+               <span className={`num ${balanceClass}`}>
                   {currentBalance} PLN
                </span>
                <span className="txt">Баланс</span>
             </div>
             <div className="stat-box">
                <span
-                  className="num"
-                  style={{ color: lessonsLeft <= 1 ? '#ff4d4f' : 'inherit' }}
+                  className={`num ${currentBalance < student.lesson_price && futureLessonsCount > 0 ? 'warning' : ''}`}
                >
                   {lessonsLeft > 0 ? lessonsLeft : 0}
                </span>
