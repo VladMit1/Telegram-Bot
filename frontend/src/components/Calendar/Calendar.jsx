@@ -177,7 +177,7 @@ export const Calendar = ({ initialStudent, onContextClear }) => {
                   ))
                ) : (
                   <div className="empty-state">
-                     <p>На сегодня уроков нет</p>
+                     <p>Запланированных уроков нет</p>
                   </div>
                )}
             </div>

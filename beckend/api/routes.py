@@ -16,6 +16,25 @@ class ProgressUpdate(BaseModel):
     last_page: int = None
     total_paid: int = None
     lesson_price: int = None
+
+class PaymentSchema(BaseModel):
+    student_id: int
+    amount: int
+    date: str
+
+@router.post("/payments")
+def create_payment(data: PaymentSchema):
+    success = db.add_payment(data.student_id, data.amount, data.date)
+    return {"status": "ok" if success else "error"}
+
+@router.delete("/payments/{payment_id}")
+def delete_payment_api(payment_id: int, data: dict):
+    # data содержит student_id и amount для корректировки баланса
+    success = db.delete_payment(payment_id, data['studentId'], data['amount'])
+    if success:
+        return {"status": "ok"}
+    raise HTTPException(status_code=400, detail="Ошибка удаления")
+
 @router.get("/contacts")
 def get_contacts():
     # Передаем токен, чтобы менеджер базы мог создать ссылки на фото

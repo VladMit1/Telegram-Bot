@@ -57,6 +57,15 @@ class DBManager:
                         FOREIGN KEY (student_id) REFERENCES contacts (id)
                     )
                 ''')
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS payments (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        student_id INTEGER,
+                        amount INTEGER,
+                        payment_date DATE,
+                        FOREIGN KEY (student_id) REFERENCES contacts (id)
+                    )
+                ''')
                 conn.commit()
                 print("✅ База данных успешно инициализирована")
         except Exception as e:
@@ -131,51 +140,42 @@ class DBManager:
                     
                     if photo_id:
                         try:
-                            # Запрос к API Telegram для получения пути к файлу
                             url = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={photo_id}"
                             file_info = requests.get(url).json()
                             if file_info.get('ok'):
                                 file_path = file_info['result']['file_path']
                                 photo_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
-                        except Exception as e:
-                            print(f"Ошибка получения фото для {row['name']}: {e}")
+                        except: pass
 
-                    # Получаем дни занятий
-                    cursor.execute("SELECT DISTINCT strftime('%d', lesson_date) FROM lessons WHERE student_id = ?", (row['id'],))
-                    days = [int(r[0]) for r in cursor.fetchall()]
+                    # ИСПРАВЛЕНО: Берем ПОЛНУЮ дату урока (YYYY-MM-DD)
+                    cursor.execute("SELECT DISTINCT lesson_date FROM lessons WHERE student_id = ?", (row['id'],))
+                    lesson_dates = [r[0] for r in cursor.fetchall()]
+
+                    # НОВОЕ: Берем платежи для этого студента
+                    cursor.execute("SELECT id,amount, payment_date FROM payments WHERE student_id = ?", (row['id'],))
+                    payments = [dict(p) for p in cursor.fetchall()]
 
                     student_dict = dict(row)
                     student_dict['photo_url'] = photo_url
-                    student_dict['attended_days'] = days
+                    student_dict['attended_lessons'] = lesson_dates # Полные даты
+                    student_dict['payments'] = payments
                     students.append(student_dict)
                 return students
         except Exception as e:
-            print(f"Общая ошибка API контактов: {e}")
+            print(f"Ошибка API: {e}")
             return []
-        
     def universal_update_contact(self, student_id, update_data):
         try:
-            if not update_data:
-                return False
-            
-            # Очищаем данные от None, чтобы не затереть существующие поля
-            filtered_data = {k: v for k, v in update_data.items() if v is not None}
-            if not filtered_data: return False
-
-            keys = filtered_data.keys()
+            if not update_data: return False
+            keys = update_data.keys()
             set_clause = ", ".join([f"{key} = ?" for key in keys])
-            values = list(filtered_data.values())
-            values.append(student_id)
-
+            values = list(update_data.values()) + [student_id]
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                query = f"UPDATE contacts SET {set_clause} WHERE id = ?"
-                cursor.execute(query, values)
+                cursor.execute(f"UPDATE contacts SET {set_clause} WHERE id = ?", values)
                 conn.commit()
-                return cursor.rowcount > 0
-        except Exception as e:
-            print(f"Ошибка при универсальном обновлении: {e}")
-            return False
+                return True
+        except: return False
     def add_lesson(self, student_id, date, time, topic, duration):
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -231,5 +231,35 @@ class DBManager:
                 return cursor.rowcount > 0
         except Exception as e:
             print(f"Ошибка при удалении занятия {lesson_id}: {e}")
+            return False
+    def add_payment(self, student_id, amount, date):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                # 1. Записываем платеж
+                cursor.execute("INSERT INTO payments (student_id, amount, payment_date) VALUES (?, ?, ?)", (student_id, amount, date))
+                # 2. Обновляем общий счетчик в контактах
+                cursor.execute("UPDATE contacts SET total_paid = total_paid + ? WHERE id = ?", (amount, student_id))
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"Ошибка при записи платежа: {e}")
+            return False
+    def delete_payment(self, payment_id, student_id, amount):
+        print(f"Удаление платежа ID {payment_id} для студента {student_id} на сумму {amount}")
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                # 1. Удаляем сам платеж
+                cursor.execute("DELETE FROM payments WHERE id = ?", (payment_id,))
+                # 2. Вычитаем сумму из общего баланса студента
+                cursor.execute(
+                    "UPDATE contacts SET total_paid = total_paid - ? WHERE id = ?",
+                    (amount, student_id)
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"Ошибка удаления платежа: {e}")
             return False
 db = DBManager()

@@ -8,7 +8,49 @@
    display: flex;
    flex-direction: column;
    gap: 12px;
+   // Если баланс положительный (Зеленый)
+   &.positive {
+      border-color: rgba(82, 196, 26, 0.3); // Нежно-зеленый
 
+      &:focus,
+      &:hover {
+         border-color: #52c41a;
+         box-shadow: 0 0 12px rgba(82, 196, 26, 0.15);
+      }
+
+      .avatar {
+         background: #f6ffed;
+         color: #52c41a;
+         border: 2px solid #b7eb8f;
+      }
+   }
+
+   // Если баланс отрицательный (Красный)
+   &.negative {
+      border-color: rgba(255, 77, 79, 0.3); // Нежно-красный
+      background: linear-gradient(
+         135deg,
+         $secondary-bg 0%,
+         rgba(255, 77, 79, 0.02) 100%
+      );
+
+      &:focus,
+      &:hover {
+         border-color: #ff4d4f;
+         box-shadow: 0 0 12px rgba(255, 77, 79, 0.15);
+      }
+
+      .avatar {
+         background: #fff1f0;
+         color: #ff4d4f;
+         border: 2px solid #ffa39e;
+      }
+
+      // Можно покрасить иконку календаря в красный для привлечения внимания
+      .calendar-icon {
+         color: #ff4d4f;
+      }
+   }
    .card-top {
       display: flex;
       align-items: center;

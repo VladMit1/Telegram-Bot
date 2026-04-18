@@ -1,0 +1,264 @@
+@use '../../../styles/variables' as *; // Импортируем все переменные из variables.scss
+
+.payment-block {
+   background-color: $secondary-bg;
+   padding: 10px;
+   border-radius: 20px;
+   border: 1px solid rgba($hint, 0.1);
+   .payment-form-container {
+      background: $secondary-bg;
+      padding: 16px;
+      border-radius: 20px;
+      border: 1px solid $secondary-bg;
+
+      .payment-form-inputs {
+         display: grid;
+         grid-template-columns: 1fr 1.4fr; // Дата чуть шире суммы
+         gap: 12px;
+
+         .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+
+            label {
+               font-size: 11px;
+               font-weight: 700;
+               color: $hint;
+               text-transform: uppercase;
+               padding-left: 4px;
+            }
+
+            input {
+               background: $bg;
+               border: 1px solid rgba($hint, 0.2);
+               border-radius: 12px;
+               padding: 12px;
+               font-size: 15px;
+               color: $text;
+               outline: none;
+               width: 100%;
+               transition: border-color 0.2s;
+
+               &:focus {
+                  border-color: $accent;
+               }
+            }
+         }
+      }
+
+      .payment-form-actions {
+         display: grid;
+         grid-template-columns: 1fr 1.5fr; // Акцент на кнопку подтверждения
+         gap: 10px;
+
+         button {
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+
+            &:active {
+               transform: scale(0.96);
+            }
+         }
+
+         .btn-cancel {
+            background: $bg;
+            color: $text;
+
+            &:hover {
+               background: $accent-text;
+            }
+         }
+
+         .btn-confirm {
+            background: $accent;
+            color: white;
+
+            &:hover {
+               filter: brightness(1.1);
+            }
+         }
+      }
+   }
+
+   // Стандартные кнопки (когда форма закрыта)
+   .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+
+      button {
+         display: flex;
+         align-items: center;
+         justify-content: center;
+         gap: 8px;
+         padding: 14px;
+         border-radius: 16px;
+         border: none;
+         font-size: 14px;
+         font-weight: 600;
+         cursor: pointer;
+         transition: background 0.2s;
+      }
+
+      .payment-btn {
+         background: $accent;
+         color: white;
+      }
+
+      .price-btn {
+         background: $secondary-bg;
+         color: $text;
+         border: 1px solid rgba($hint, 0.1);
+      }
+   }
+   .payments-history-section {
+      border-top: 1px solid rgba($hint, 0.1);
+      padding-top: 10px;
+
+      .history-toggle {
+         width: 100%;
+         display: flex;
+         justify-content: space-between;
+         align-items: center;
+         background: none;
+         border: none;
+         padding: 8px 4px;
+         color: $hint;
+         font-size: 13px;
+         font-weight: 600;
+         cursor: pointer;
+         transition: color 0.2s;
+
+         .chevron {
+            transition: transform 0.3s ease;
+         }
+
+         &.active {
+            color: $text;
+            .chevron {
+               transform: rotate(180deg);
+            }
+         }
+
+         &:hover {
+            color: $accent;
+         }
+      }
+
+      .history-content {
+         overflow: hidden; // Важно для анимации высоты
+
+         .history-list {
+            padding: 8px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+
+            .payment-row {
+               display: flex;
+               align-items: center;
+               background: rgba($bg, 0.6);
+               padding: 8px 12px;
+               border-radius: 10px;
+               font-size: 13px;
+
+               .p-date {
+                  color: $hint;
+                  width: 75px;
+               }
+
+               .p-amount {
+                  flex-grow: 1;
+                  font-weight: 600;
+               }
+
+               button {
+                  background: none;
+                  border: none;
+                  color: rgba(#ff4d4f, 0.6);
+                  cursor: pointer;
+                  font-size: 14px;
+                  padding: 2px 6px;
+                  &:hover {
+                     color: #ff4d4f;
+                  }
+               }
+            }
+         }
+      }
+   }
+   // Стили для кнопок оплаты и цены
+   .action-buttons {
+      display: flex;
+      gap: 10px;
+
+      button {
+         flex: 1;
+         display: flex;
+         align-items: center;
+         justify-content: center;
+         gap: 8px;
+         padding: 12px;
+         border-radius: 14px;
+         border: none;
+         font-size: 13px;
+         font-weight: 600;
+         cursor: pointer;
+         transition: opacity 0.2s;
+
+         &:active {
+            opacity: 0.7;
+         }
+      }
+
+      .payment-btn {
+         background: $accent;
+         color: #fff;
+      }
+
+      .price-btn {
+         background: $secondary-bg;
+         color: $text;
+      }
+   }
+
+   .stats-row {
+      display: grid;
+      // Меняем на 3 колонки, так как у нас теперь: Баланс, Остаток уроков и Месяц
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+
+      .stat-box {
+         background: $secondary-bg;
+         padding: 10px 4px;
+         border-radius: 12px;
+         display: flex;
+         flex-direction: column;
+         align-items: center;
+         text-align: center;
+
+         .num {
+            font-size: 16px;
+            font-weight: 700;
+            color: $text;
+            line-height: 1.2;
+         }
+         .txt {
+            font-size: 10px;
+            color: $hint;
+            margin-top: 2px;
+            text-transform: lowercase;
+         }
+      }
+   }
+}

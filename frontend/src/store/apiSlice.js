@@ -5,7 +5,7 @@ export const apiSlice = createApi({
    baseQuery: fetchBaseQuery({
       baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
    }),
-   tagTypes: ['Contacts', 'Events'],
+   tagTypes: ['Contacts', 'Lessons'],
    keepUnusedDataFor: 900,
    endpoints: (builder) => ({
       // Теперь принимает month и year для фильтрации в БД
@@ -60,6 +60,22 @@ export const apiSlice = createApi({
          }),
          invalidatesTags: ['Lessons'],
       }),
+      createPayment: builder.mutation({
+         query: (data) => ({
+            url: '/payments',
+            method: 'POST',
+            body: data,
+         }),
+         invalidatesTags: ['Contacts'], // Чтобы баланс и календарь обновились
+      }),
+      deletePayment: builder.mutation({
+         query: ({ paymentId, studentId, amount }) => ({
+            url: `/payments/${paymentId}`,
+            method: 'DELETE',
+            body: { studentId, amount }, // Передаем данные для корректировки баланса
+         }),
+         invalidatesTags: ['Contacts'],
+      }),
    }),
 });
 
@@ -70,4 +86,6 @@ export const {
    useGetLessonsQuery,
    useDeleteLessonMutation,
    useUpdateLessonMutation,
+   useCreatePaymentMutation,
+   useDeletePaymentMutation,
 } = apiSlice;

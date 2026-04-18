@@ -1,94 +1,49 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-   X,
-   GraduationCap,
-   PlusCircle,
-   Settings,
-   Check,
-   Calendar as CalendarIcon,
-} from 'lucide-react';
+import { motion } from 'framer-motion';
+import { X, GraduationCap } from 'lucide-react';
 import { StudentCalendar } from './components/StudentCalendar';
 import { ProgressBlock } from './components/ProgressBlock';
 import { useMemo, useState } from 'react';
-import {
-   useGetLessonsQuery,
-   useUpdateProgressMutation,
-} from '../../store/apiSlice';
+import { useGetLessonsQuery, useGetContactsQuery } from '../../store/apiSlice';
 import moment from 'moment';
+import { PaymentBlock } from './components/PaymentBlok';
 
-export const StudentModal = ({ student, onClose }) => {
+export const StudentModal = ({ student: initialStudent, onClose }) => {
    const { data: allLessons = [] } = useGetLessonsQuery();
-   const [updateContact] = useUpdateProgressMutation();
+   const { data: allStudents = [] } = useGetContactsQuery();
 
-   // Состояния
+   // Получаем актуальные данные из Redux
+   const student = useMemo(
+      () =>
+         allStudents.find((s) => s.id === initialStudent.id) || initialStudent,
+      [allStudents, initialStudent]
+   );
+
    const [currentMonth, setCurrentMonth] = useState(moment());
-   const [isPayMode, setIsPayMode] = useState(false);
 
-   // Поля для новой оплаты
-   const [payAmount, setPayAmount] = useState(student.lesson_price || 500);
-   const [payDate, setPayDate] = useState(moment().format('YYYY-MM-DD'));
-
-   const lessonPrice = student.lesson_price || 500;
-   const totalPaid = student.total_paid || 0;
-
-   // 1. Расчет истории с учетом оплаты (сквозной баланс)
+   // ГЛАВНОЕ: Смешиваем уроки и платежи
    const studentHistory = useMemo(() => {
-      const sorted = allLessons
+      // 1. Уроки (делаем копию через [...allLessons] перед сортировкой)
+      const lessons = [...allLessons]
          .filter((l) => String(l.student_id) === String(student.id))
-         .sort((a, b) => {
-            const dtA = `${a.lesson_date} ${a.lesson_time || '00:00'}`;
-            const dtB = `${b.lesson_date} ${b.lesson_time || '00:00'}`;
-            return dtA.localeCompare(dtB);
-         });
+         .sort((a, b) => a.lesson_date.localeCompare(b.lesson_date)) // Теперь не упадет!
+         .map((l, idx) => ({
+            ...l,
+            type: 'lesson',
+            date: l.lesson_date,
+            is_paid: student.total_paid >= (idx + 1) * student.lesson_price,
+         }));
 
-      return sorted.map((lesson, index) => {
-         const costUntilNow = (index + 1) * lessonPrice;
-         return {
-            ...lesson,
-            date: lesson.lesson_date,
-            is_paid: totalPaid >= costUntilNow,
-         };
-      });
-   }, [allLessons, student.id, totalPaid, lessonPrice]);
+      // 2. Платежи (берем payment_date, который мы настроили в БД)
+      const payments = (student.payments || []).map((p) => ({
+         id: p.id,
+         date: p.payment_date || p.date,
+         type: 'payment',
+         amount: p.amount,
+      }));
 
-   // 2. Статистика
-   const currentBalance = totalPaid - studentHistory.length * lessonPrice;
-   const lessonsLeft = Math.floor(currentBalance / lessonPrice);
-
-   const lessonsThisMonth = useMemo(() => {
-      return studentHistory.filter(
-         (l) =>
-            moment(l.date).isSame(currentMonth, 'month') &&
-            moment(l.date).isSame(currentMonth, 'year')
-      );
-   }, [studentHistory, currentMonth]);
-
-   // Хендлеры
-   const handleConfirmPayment = async () => {
-      if (payAmount && !isNaN(payAmount)) {
-         const newTotal = totalPaid + Number(payAmount);
-         try {
-            await updateContact({
-               id: student.id,
-               total_paid: newTotal,
-               // payDate можно сохранять отдельно, если в БД есть таблица платежей
-            }).unwrap();
-            setIsPayMode(false);
-         } catch (e) {
-            alert('Ошибка при сохранении');
-         }
-      }
-   };
-
-   const handleChangePrice = async () => {
-      const newPrice = prompt('Цена за 1 урок (PLN):', lessonPrice);
-      if (newPrice && !isNaN(newPrice)) {
-         await updateContact({
-            id: student.id,
-            lesson_price: Number(newPrice),
-         });
-      }
-   };
+      // Объединяем и фильтруем возможные пустые даты
+      return [...lessons, ...payments].filter((event) => event.date);
+   }, [allLessons, student]);
 
    return (
       <div className="modal-overlay" onClick={onClose}>
@@ -100,13 +55,12 @@ export const StudentModal = ({ student, onClose }) => {
             onClick={(e) => e.stopPropagation()}
          >
             <div className="modal-handle" />
-
             <header className="modal-header">
                <div className="title">
                   <GraduationCap size={24} />
                   <h2>{student.name}</h2>
                </div>
-               <button className="close-btn" onClick={onClose}>
+               <button onClick={onClose}>
                   <X />
                </button>
             </header>
@@ -117,90 +71,10 @@ export const StudentModal = ({ student, onClose }) => {
                   viewDate={currentMonth}
                   setViewDate={setCurrentMonth}
                />
-
-               <AnimatePresence mode="wait">
-                  {isPayMode ? (
-                     <motion.div
-                        className="payment-form-container"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                     >
-                        <div className="payment-form-inputs">
-                           <div className="input-box">
-                              <label>Сумма (PLN)</label>
-                              <input
-                                 type="number"
-                                 value={payAmount}
-                                 onChange={(e) => setPayAmount(e.target.value)}
-                              />
-                           </div>
-                           <div className="input-box">
-                              <label>Дата оплаты</label>
-                              <input
-                                 type="date"
-                                 value={payDate}
-                                 onChange={(e) => setPayDate(e.target.value)}
-                              />
-                           </div>
-                        </div>
-                        <div className="payment-form-actions">
-                           <button
-                              className="btn-cancel"
-                              onClick={() => setIsPayMode(false)}
-                           >
-                              Отмена
-                           </button>
-                           <button
-                              className="btn-confirm"
-                              onClick={handleConfirmPayment}
-                           >
-                              <Check size={16} /> Подтвердить
-                           </button>
-                        </div>
-                     </motion.div>
-                  ) : (
-                     <div className="action-buttons">
-                        <button
-                           className="payment-btn"
-                           onClick={() => setIsPayMode(true)}
-                        >
-                           <PlusCircle size={18} /> Внести оплату
-                        </button>
-                        <button
-                           className="price-btn"
-                           onClick={handleChangePrice}
-                        >
-                           <Settings size={18} /> Цена: {lessonPrice}₽
-                        </button>
-                     </div>
-                  )}
-               </AnimatePresence>
-
-               <div className="stats-row">
-                  <div className="stat-box">
-                     <span
-                        className="num"
-                        style={{
-                           color: currentBalance < 0 ? '#ff4d4f' : '#52c41a',
-                        }}
-                     >
-                        {currentBalance} PLN
-                     </span>
-                     <span className="txt">Баланс</span>
-                  </div>
-                  <div className="stat-box">
-                     <span className="num">
-                        {lessonsLeft > 0 ? lessonsLeft : 0}
-                     </span>
-                     <span className="txt">Запас уроков</span>
-                  </div>
-                  <div className="stat-box">
-                     <span className="num">{lessonsThisMonth.length}</span>
-                     <span className="txt">{currentMonth.format('MMM')}</span>
-                  </div>
-               </div>
-
+               <PaymentBlock
+                  student={student}
+                  studentHistory={studentHistory}
+               />
                <ProgressBlock student={student} />
             </div>
          </motion.div>

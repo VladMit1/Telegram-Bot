@@ -1,5 +1,4 @@
 import moment from 'moment';
-import { useState } from 'react';
 
 export const StudentCalendar = ({
    attendedDays = [],
@@ -10,15 +9,6 @@ export const StudentCalendar = ({
    const firstDayWeekday = viewDate.clone().startOf('month').isoWeekday();
    const firstDayOffset = firstDayWeekday - 1;
 
-   const prevMonth = (e) => {
-      e.stopPropagation(); // Останавливаем закрытие модалки
-      setViewDate(viewDate.clone().subtract(1, 'month'));
-   };
-
-   const nextMonth = (e) => {
-      e.stopPropagation(); // Останавливаем закрытие модалки
-      setViewDate(viewDate.clone().add(1, 'month'));
-   };
    const cells = [];
    for (let i = 0; i < firstDayOffset; i++) cells.push(null);
    for (let i = 1; i <= daysInMonth; i++) cells.push(i);
@@ -27,11 +17,17 @@ export const StudentCalendar = ({
    return (
       <section className="activity-section">
          <div className="section-header">
-            <button className="nav-btn" onClick={prevMonth}>
+            <button
+               onClick={() =>
+                  setViewDate(viewDate.clone().subtract(1, 'month'))
+               }
+            >
                &lt;
             </button>
             <h3>{viewDate.format('MMMM YYYY')}</h3>
-            <button className="nav-btn" onClick={nextMonth}>
+            <button
+               onClick={() => setViewDate(viewDate.clone().add(1, 'month'))}
+            >
                &gt;
             </button>
          </div>
@@ -45,21 +41,18 @@ export const StudentCalendar = ({
             <div className="month-grid">
                {cells.map((day, i) => {
                   if (day === null)
-                     return (
-                        <div key={`empty-${i}`} className="day-cell empty" />
-                     );
+                     return <div key={i} className="day-cell empty" />;
 
-                  // Генерируем строку даты для текущей ячейки
-                  const currentFullDate = viewDate
+                  const dateStr = viewDate
                      .clone()
                      .date(day)
                      .format('YYYY-MM-DD');
-
-                  // Ищем объект урока, который соответствует этой дате
-                  const lessonInfo = attendedDays.find(
-                     (d) => d.date === currentFullDate
+                  const dayEvents = attendedDays.filter(
+                     (d) => d.date === dateStr
                   );
 
+                  const lesson = dayEvents.find((e) => e.type === 'lesson');
+                  const payment = dayEvents.find((e) => e.type === 'payment');
                   const isToday = moment().isSame(
                      viewDate.clone().date(day),
                      'day'
@@ -67,19 +60,17 @@ export const StudentCalendar = ({
 
                   return (
                      <div
-                        key={currentFullDate}
-                        className={
-                           `day-cell 
-                           ${lessonInfo ? 'attended' : ''} 
-                           ${isToday ? 'today' : ''} 
-                           ${lessonInfo?.status || ''}` // Добавляем класс статуса (planned/completed)
-                        }
-                        onClick={() =>
-                           lessonInfo && alert(`Тема: ${lessonInfo.topic}`)
-                        }
+                        key={dateStr}
+                        className={`day-cell 
+                                    ${lesson ? 'attended' : ''} 
+                                    ${lesson && !lesson.is_paid ? 'unpaid' : ''} 
+                                    ${isToday ? 'today' : ''} 
+                                    ${payment ? 'has-payment' : ''}`}
                      >
                         <span className="day-number">{day}</span>
-                        {lessonInfo && <div className="status-dot" />}
+                        <div className="marker">
+                           {payment && <div className="coin">🪙</div>}
+                        </div>
                      </div>
                   );
                })}

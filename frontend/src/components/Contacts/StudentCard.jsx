@@ -4,10 +4,23 @@ import moment from 'moment';
 
 export const StudentCard = ({ student, onOpen, onSchedule }) => {
    const currentDay = moment().date();
+   const lessonPrice = student.lesson_price || 500;
+   const totalPaid = student.total_paid || 0;
 
+   // Считаем количество проведенных уроков для этого студента
+   // Если уроки приходят в объекте студента как attended_lessons:
+   const attendedCount = (student.attended_lessons || []).length;
+
+   // Либо, если ты берешь их из общего стора lessons:
+   // const attendedCount = allLessons.filter(l => l.student_id === student.id).length;
+
+   const balance = totalPaid - attendedCount * lessonPrice;
+
+   // Определяем статус для класса
+   const balanceStatus = balance < 0 ? 'negative' : 'positive';
    return (
       <motion.div
-         className="student-card-v2"
+         className={`student-card-v2 ${balanceStatus}`}
          whileTap={{ scale: 0.98 }}
          onClick={() => onOpen(student)}
       >
@@ -17,7 +30,7 @@ export const StudentCard = ({ student, onOpen, onSchedule }) => {
                   <img
                      src={student.photo_url}
                      referrerPolicy="no-referrer"
-                     loading='lazy'
+                     loading="lazy"
                      alt={student.name}
                      style={{
                         width: '100%',
