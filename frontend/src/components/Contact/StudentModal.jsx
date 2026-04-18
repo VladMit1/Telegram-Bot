@@ -10,6 +10,7 @@ import { PaymentBlock } from './components/PaymentBlok';
 export const StudentModal = ({ student: initialStudent, onClose }) => {
    const { data: allLessons = [] } = useGetLessonsQuery();
    const { data: allStudents = [] } = useGetContactsQuery();
+   const todayStr = moment().format('YYYY-MM-DD');
 
    // Получаем актуальные данные из Redux
    const student = useMemo(
@@ -26,12 +27,16 @@ export const StudentModal = ({ student: initialStudent, onClose }) => {
       const lessons = [...allLessons]
          .filter((l) => String(l.student_id) === String(student.id))
          .sort((a, b) => a.lesson_date.localeCompare(b.lesson_date)) // Теперь не упадет!
-         .map((l, idx) => ({
-            ...l,
-            type: 'lesson',
-            date: l.lesson_date,
-            is_paid: student.total_paid >= (idx + 1) * student.lesson_price,
-         }));
+         .map((l, idx) => {
+            const isConducted = l.lesson_date <= todayStr;
+            return {
+               ...l,
+               type: 'lesson',
+               date: l.lesson_date,
+               is_conducted: isConducted,
+               is_paid: student.total_paid >= (idx + 1) * student.lesson_price,
+            };
+         });
 
       // 2. Платежи (берем payment_date, который мы настроили в БД)
       const payments = (student.payments || []).map((p) => ({

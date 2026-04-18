@@ -1,23 +1,44 @@
 import { motion } from 'framer-motion';
 import { BookOpen, CalendarPlus, UserPlus, Calendar } from 'lucide-react';
 import moment from 'moment';
+import { useGetLessonsQuery } from '../../store/apiSlice';
 
 export const StudentCard = ({ student, onOpen, onSchedule }) => {
+   const { data: allLessons = [] } = useGetLessonsQuery();
    const currentDay = moment().date();
-   const lessonPrice = student.lesson_price || 500;
-   const totalPaid = student.total_paid || 0;
+   const todayStr = moment().format('YYYY-MM-DD');
+   const price = Number(student.lesson_price) || 0;
+   const paid = Number(student.total_paid) || 0;
 
-   // Считаем количество проведенных уроков для этого студента
-   // Если уроки приходят в объекте студента как attended_lessons:
-   const attendedCount = (student.attended_lessons || []).length;
+   // 1. Считаем проведенные уроки (<= сегодня)
+   const conductedCount = allLessons.filter(
+      (l) =>
+         String(l.student_id) === String(student.id) &&
+         l.lesson_date <= todayStr
+   ).length;
 
-   // Либо, если ты берешь их из общего стора lessons:
-   // const attendedCount = allLessons.filter(l => l.student_id === student.id).length;
+   // 2. Считаем будущие уроки (> сегодня)
+   const futureCount = allLessons.filter(
+      (l) =>
+         String(l.student_id) === String(student.id) && l.lesson_date > todayStr
+   ).length;
 
-   const balance = totalPaid - attendedCount * lessonPrice;
+   const currentBalance = paid - conductedCount * price;
 
-   // Определяем статус для класса
-   const balanceStatus = balance < 0 ? 'negative' : 'positive';
+   // ОПРЕДЕЛЯЕМ СТАТУС
+   let balanceStatus = 'positive';
+
+   if (currentBalance < 0) {
+      // 1. Если баланс уже отрицательный — КРАСНЫЙ (Долг)
+      balanceStatus = 'negative';
+   } else if (currentBalance < price && futureCount > 0) {
+      // 2. Если денег меньше, чем стоит 1 урок, И есть занятия впереди — ОРАНЖЕВЫЙ (Варнинг)
+      // Сюда попадет и баланс 0, если запланированы уроки.
+      balanceStatus = 'warning';
+   } else if (currentBalance === 0 && futureCount === 0) {
+      // 3. Если баланс 0 и ничего не запланировано — можно оставить нейтральным или оранжевым
+      balanceStatus = 'neutral';
+   }
    return (
       <motion.div
          className={`student-card-v2 ${balanceStatus}`}

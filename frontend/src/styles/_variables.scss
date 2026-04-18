@@ -1,13 +1,48 @@
+// Цвета темы (Telegram)
 $bg: var(--tg-theme-bg-color, #ffffff);
 $secondary-bg: var(--tg-theme-secondary-bg-color, #f1f1f4);
-$text: var(--tg-theme-text-color, #000000);
+$text: var(--tg-theme-text-color, #222222);
 $hint: var(--tg-theme-hint-color, #999999);
 $accent: var(--tg-theme-button-color, #2481cc);
 $accent-text: var(--tg-theme-button-text-color, #ffffff);
+$link: var(--tg-theme-link-color, #2481cc);
+
+// Семантические цвета (для баланса и статусов)
+$success: #31b545; // Сочный зеленый (положительный баланс)
+$danger: #e53935; // Насыщенный красный (долг)
+$warning: #ffa000; // Оранжевый (запас на 1 урок)
+$info: #1da1f2; // Голубой (планируемые уроки)
+
+// Прозрачные варианты (для фонов карточек и баджей)
+$success-soft: rgba($success, 0.1);
+$danger-soft: rgba($danger, 0.1);
+$accent-soft: rgba($accent, 0.15);
+$hint-soft: rgba($hint, 0.1);
+
+// Параметры интерфейса
 $radius: 16px;
+$radius-sm: 10px;
+$radius-lg: 24px;
+
+// Тени и бордеры
+$shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
+$shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+$border-light: 1px solid rgba($hint, 0.15);
+
+// Шрифты
+$font-main:
+   -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+   sans-serif;
 
 @mixin flex-center {
    display: flex;
    align-items: center;
    justify-content: center;
+}
+
+@mixin card-style {
+   background: $bg;
+   border: $border-light;
+   border-radius: $radius;
+   padding: 16px;
 }

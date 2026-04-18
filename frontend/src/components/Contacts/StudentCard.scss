@@ -23,6 +23,10 @@
          color: #52c41a;
          border: 2px solid #b7eb8f;
       }
+      // Можно покрасить иконку календаря в зеленый для привлечения внимания
+      .calendar-icon {
+         color: #52c41a;
+      }
    }
 
    // Если баланс отрицательный (Красный)
@@ -49,6 +53,31 @@
       // Можно покрасить иконку календаря в красный для привлечения внимания
       .calendar-icon {
          color: #ff4d4f;
+      }
+   }
+   &.warning {
+      border-color: rgba(255, 165, 0, 0.3); // Нежно-оранжевый
+      background: linear-gradient(
+         135deg,
+         $secondary-bg 0%,
+         rgba(255, 165, 0, 0.02) 100%
+      );
+
+      &:focus,
+      &:hover {
+         border-color: #ffa500;
+         box-shadow: 0 0 12px rgba(255, 165, 0, 0.15);
+      }
+
+      .avatar {
+         background: #fff7e6;
+         color: #ffa500;
+         border: 2px solid #ffd591;
+      }
+
+      // Можно покрасить иконку календаря в оранжевый для привлечения внимания
+      .calendar-icon {
+         color: #ffa500;
       }
    }
    .card-top {

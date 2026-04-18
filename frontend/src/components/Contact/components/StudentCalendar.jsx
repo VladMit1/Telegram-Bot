@@ -50,8 +50,8 @@ export const StudentCalendar = ({
                   const dayEvents = attendedDays.filter(
                      (d) => d.date === dateStr
                   );
-
                   const lesson = dayEvents.find((e) => e.type === 'lesson');
+                  const isFuture = dateStr > moment().format('YYYY-MM-DD');
                   const payment = dayEvents.find((e) => e.type === 'payment');
                   const isToday = moment().isSame(
                      viewDate.clone().date(day),
@@ -62,14 +62,18 @@ export const StudentCalendar = ({
                      <div
                         key={dateStr}
                         className={`day-cell 
-                                    ${lesson ? 'attended' : ''} 
-                                    ${lesson && !lesson.is_paid ? 'unpaid' : ''} 
-                                    ${isToday ? 'today' : ''} 
-                                    ${payment ? 'has-payment' : ''}`}
+         ${lesson ? 'attended' : ''} 
+         ${lesson && !lesson.is_paid && !isFuture ? 'unpaid' : ''} 
+         ${lesson && isFuture ? 'future-lesson' : ''}
+         ${isToday ? 'today' : ''} 
+         ${payment ? 'has-payment' : ''}`}
                      >
                         <span className="day-number">{day}</span>
                         <div className="marker">
                            {payment && <div className="coin">🪙</div>}
+                           {lesson && isFuture && (
+                              <div className="plan-dot">🗓️</div>
+                           )}
                         </div>
                      </div>
                   );

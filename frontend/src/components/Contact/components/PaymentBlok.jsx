@@ -10,7 +10,6 @@ import {
 import { useState } from 'react';
 
 export const PaymentBlock = ({ student, studentHistory }) => {
-   console.log('🚀 ~ PaymentBlock ~ studentHistory:', student);
    const [updateContact] = useUpdateProgressMutation();
    const [createPayment] = useCreatePaymentMutation();
    const [deletePayment] = useDeletePaymentMutation();
@@ -19,11 +18,21 @@ export const PaymentBlock = ({ student, studentHistory }) => {
    const [isPayMode, setIsPayMode] = useState(false);
    const [payAmount, setPayAmount] = useState(500);
    const [payDate, setPayDate] = useState(moment().format('YYYY-MM-DD'));
+   const todayStr = moment().format('YYYY-MM-DD');
+   // 1. Считаем ТОЛЬКО проведенные уроки (дата <= сегодня)
+   const conductedLessons = studentHistory.filter(
+      (h) => h.type === 'lesson' && h.date <= todayStr
+   );
+   // 2. Актуальный баланс (Оплаты минус только совершенные уроки)
    const currentBalance =
-      student.total_paid -
-      studentHistory.filter((h) => h.type === 'lesson').length *
-         student.lesson_price;
+      student.total_paid - conductedLessons.length * student.lesson_price;
+
+   // 3. Запас уроков (сколько еще можно провести на текущий депозит)
    const lessonsLeft = Math.floor(currentBalance / student.lesson_price);
+   // 4. Будущие уроки (просто для инфо, если захочешь вывести)
+   const futureLessonsCount = studentHistory.filter(
+      (h) => h.type === 'lesson' && h.date > todayStr
+   ).length;
    const handleConfirmPayment = async () => {
       try {
          await createPayment({
@@ -62,12 +71,24 @@ export const PaymentBlock = ({ student, studentHistory }) => {
                <span className="txt">Баланс</span>
             </div>
             <div className="stat-box">
-               <span className="num">{lessonsLeft > 0 ? lessonsLeft : 0}</span>
-               <span className="txt">Запас уроков</span>
+               <span
+                  className="num"
+                  style={{ color: lessonsLeft <= 1 ? '#ff4d4f' : 'inherit' }}
+               >
+                  {lessonsLeft > 0 ? lessonsLeft : 0}
+               </span>
+               <span className="txt">
+                  Запас{' '}
+                  {futureLessonsCount > 0 && (
+                     <span style={{ display: 'block', fontSize: '8px' }}>
+                        (+ {futureLessonsCount} план)
+                     </span>
+                  )}
+               </span>
             </div>
             <div className="stat-box">
                <span className="num">{student.attended_lessons?.length}</span>
-               <span className="txt">Посещенные уроки</span>
+               <span className="txt">В этом месяце</span>
             </div>
          </div>
 
