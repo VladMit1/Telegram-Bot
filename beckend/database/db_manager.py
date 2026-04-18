@@ -15,6 +15,8 @@ class DBManager:
             with sqlite3.connect(self.db_path) as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
+                
+                # 1. Создаем таблицу контактов (если её нет)
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS contacts (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,9 +27,25 @@ class DBManager:
                         chat_id INTEGER,
                         last_book TEXT DEFAULT 'Не выбрана',
                         last_page INTEGER DEFAULT 0,
-                        balance INTEGER DEFAULT 0
+                        balance INTEGER DEFAULT 0,
+                        total_paid INTEGER DEFAULT 0,
+                        lesson_price INTEGER DEFAULT 500
                     )
                 ''')
+
+                # 2. АВТО-МИГРАЦИЯ: Проверяем наличие колонок, если таблица уже существовала
+                cursor.execute("PRAGMA table_info(contacts)")
+                existing_columns = [column[1] for column in cursor.fetchall()]
+                
+                if 'total_paid' not in existing_columns:
+                    print("🛠 Добавляю колонку total_paid в таблицу contacts...")
+                    cursor.execute("ALTER TABLE contacts ADD COLUMN total_paid INTEGER DEFAULT 0")
+                
+                if 'lesson_price' not in existing_columns:
+                    print("🛠 Добавляю колонку lesson_price в таблицу contacts...")
+                    cursor.execute("ALTER TABLE contacts ADD COLUMN lesson_price INTEGER DEFAULT 500")
+
+                # 3. Таблица уроков
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS lessons (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,8 +58,9 @@ class DBManager:
                     )
                 ''')
                 conn.commit()
+                print("✅ База данных успешно инициализирована")
         except Exception as e:
-            print(f"Ошибка БД при инициализации: {e}")
+            print(f"❌ Ошибка БД при инициализации: {e}")
 
     def add_contact(self, name, phone, photo_id, chat_id):
         try:
@@ -134,15 +153,28 @@ class DBManager:
             print(f"Общая ошибка API контактов: {e}")
             return []
         
-    def update_progress(self, student_id, last_book, last_page):
+    def universal_update_contact(self, student_id, update_data):
         try:
+            if not update_data:
+                return False
+            
+            # Очищаем данные от None, чтобы не затереть существующие поля
+            filtered_data = {k: v for k, v in update_data.items() if v is not None}
+            if not filtered_data: return False
+
+            keys = filtered_data.keys()
+            set_clause = ", ".join([f"{key} = ?" for key in keys])
+            values = list(filtered_data.values())
+            values.append(student_id)
+
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute("UPDATE contacts SET last_book = ?, last_page = ? WHERE id = ?", (last_book, last_page, student_id))
+                query = f"UPDATE contacts SET {set_clause} WHERE id = ?"
+                cursor.execute(query, values)
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception as e:
-            print(f"Ошибка при обновлении прогресса: {e}")
+            print(f"Ошибка при универсальном обновлении: {e}")
             return False
     def add_lesson(self, student_id, date, time, topic, duration):
         try:
@@ -169,4 +201,35 @@ class DBManager:
             ''')
             return [dict(row) for row in cursor.fetchall()]
 
+    def update_lesson(self, lesson_id, update_data):
+        try:
+            if not update_data:
+                return False
+                
+            keys = update_data.keys()
+            set_clause = ", ".join([f"{key} = ?" for key in keys])
+            values = list(update_data.values())
+            values.append(lesson_id)
+
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                query = f"UPDATE lessons SET {set_clause} WHERE id = ?"
+                cursor.execute(query, values)
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Ошибка при обновлении занятия {lesson_id}: {e}")
+            return False
+            
+    def delete_lesson(self, lesson_id):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM lessons WHERE id = ?", (lesson_id,))
+                conn.commit()
+                # Возвращаем True, если хотя бы одна строка была удалена
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Ошибка при удалении занятия {lesson_id}: {e}")
+            return False
 db = DBManager()

@@ -1,5 +1,12 @@
-import { motion } from 'framer-motion';
-import { X, GraduationCap, PlusCircle, Settings } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+   X,
+   GraduationCap,
+   PlusCircle,
+   Settings,
+   Check,
+   Calendar as CalendarIcon,
+} from 'lucide-react';
 import { StudentCalendar } from './components/StudentCalendar';
 import { ProgressBlock } from './components/ProgressBlock';
 import { useMemo, useState } from 'react';
@@ -11,68 +18,70 @@ import moment from 'moment';
 
 export const StudentModal = ({ student, onClose }) => {
    const { data: allLessons = [] } = useGetLessonsQuery();
-   const [currentMonth, setCurrentMonth] = useState(moment());
    const [updateContact] = useUpdateProgressMutation();
 
-   // Данные из БД (с дефолтными значениями, если в БД пусто)
+   // Состояния
+   const [currentMonth, setCurrentMonth] = useState(moment());
+   const [isPayMode, setIsPayMode] = useState(false);
+
+   // Поля для новой оплаты
+   const [payAmount, setPayAmount] = useState(student.lesson_price || 500);
+   const [payDate, setPayDate] = useState(moment().format('YYYY-MM-DD'));
+
    const lessonPrice = student.lesson_price || 500;
    const totalPaid = student.total_paid || 0;
 
-   // 1. УМНЫЙ РАСЧЕТ ИСТОРИИ (с учетом оплаты)
+   // 1. Расчет истории с учетом оплаты (сквозной баланс)
    const studentHistory = useMemo(() => {
-      // Сначала фильтруем и сортируем ВСЕ уроки по дате и времени
       const sorted = allLessons
-         .filter((lesson) => String(lesson.student_id) === String(student.id))
+         .filter((l) => String(l.student_id) === String(student.id))
          .sort((a, b) => {
             const dtA = `${a.lesson_date} ${a.lesson_time || '00:00'}`;
             const dtB = `${b.lesson_date} ${b.lesson_time || '00:00'}`;
             return dtA.localeCompare(dtB);
          });
 
-      // Проходимся по списку и смотрим, на какой урок хватило денег из "котла"
       return sorted.map((lesson, index) => {
          const costUntilNow = (index + 1) * lessonPrice;
-         const isPaid = totalPaid >= costUntilNow;
-
          return {
             ...lesson,
             date: lesson.lesson_date,
-            is_paid: isPaid, // Это поле будет использовать календарь для цвета
+            is_paid: totalPaid >= costUntilNow,
          };
       });
    }, [allLessons, student.id, totalPaid, lessonPrice]);
 
-   // 2. Расчет баланса и статистики
-   const totalLessonsCount = studentHistory.length;
-   const currentBalance = totalPaid - totalLessonsCount * lessonPrice;
+   // 2. Статистика
+   const currentBalance = totalPaid - studentHistory.length * lessonPrice;
    const lessonsLeft = Math.floor(currentBalance / lessonPrice);
 
    const lessonsThisMonth = useMemo(() => {
       return studentHistory.filter(
-         (lesson) =>
-            moment(lesson.date).isSame(currentMonth, 'month') &&
-            moment(lesson.date).isSame(currentMonth, 'year')
+         (l) =>
+            moment(l.date).isSame(currentMonth, 'month') &&
+            moment(l.date).isSame(currentMonth, 'year')
       );
    }, [studentHistory, currentMonth]);
 
-   // Хендлеры для кнопок
-   const handleAddPayment = async () => {
-      const amount = prompt('Введите сумму пополнения (₽):');
-      if (amount && !isNaN(amount)) {
-         const newTotal = totalPaid + Number(amount);
+   // Хендлеры
+   const handleConfirmPayment = async () => {
+      if (payAmount && !isNaN(payAmount)) {
+         const newTotal = totalPaid + Number(payAmount);
          try {
             await updateContact({
                id: student.id,
                total_paid: newTotal,
+               // payDate можно сохранять отдельно, если в БД есть таблица платежей
             }).unwrap();
+            setIsPayMode(false);
          } catch (e) {
-            alert('Ошибка сохранения');
+            alert('Ошибка при сохранении');
          }
       }
    };
 
    const handleChangePrice = async () => {
-      const newPrice = prompt('Цена за 1 урок (₽):', lessonPrice);
+      const newPrice = prompt('Цена за 1 урок (PLN):', lessonPrice);
       if (newPrice && !isNaN(newPrice)) {
          await updateContact({
             id: student.id,
@@ -109,14 +118,64 @@ export const StudentModal = ({ student, onClose }) => {
                   setViewDate={setCurrentMonth}
                />
 
-               <div className="action-buttons">
-                  <button className="payment-btn" onClick={handleAddPayment}>
-                     <PlusCircle size={18} /> Внести оплату
-                  </button>
-                  <button className="price-btn" onClick={handleChangePrice}>
-                     <Settings size={18} /> Цена: {lessonPrice}₽
-                  </button>
-               </div>
+               <AnimatePresence mode="wait">
+                  {isPayMode ? (
+                     <motion.div
+                        className="payment-form-container"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                     >
+                        <div className="payment-form-inputs">
+                           <div className="input-box">
+                              <label>Сумма (PLN)</label>
+                              <input
+                                 type="number"
+                                 value={payAmount}
+                                 onChange={(e) => setPayAmount(e.target.value)}
+                              />
+                           </div>
+                           <div className="input-box">
+                              <label>Дата оплаты</label>
+                              <input
+                                 type="date"
+                                 value={payDate}
+                                 onChange={(e) => setPayDate(e.target.value)}
+                              />
+                           </div>
+                        </div>
+                        <div className="payment-form-actions">
+                           <button
+                              className="btn-cancel"
+                              onClick={() => setIsPayMode(false)}
+                           >
+                              Отмена
+                           </button>
+                           <button
+                              className="btn-confirm"
+                              onClick={handleConfirmPayment}
+                           >
+                              <Check size={16} /> Подтвердить
+                           </button>
+                        </div>
+                     </motion.div>
+                  ) : (
+                     <div className="action-buttons">
+                        <button
+                           className="payment-btn"
+                           onClick={() => setIsPayMode(true)}
+                        >
+                           <PlusCircle size={18} /> Внести оплату
+                        </button>
+                        <button
+                           className="price-btn"
+                           onClick={handleChangePrice}
+                        >
+                           <Settings size={18} /> Цена: {lessonPrice}₽
+                        </button>
+                     </div>
+                  )}
+               </AnimatePresence>
 
                <div className="stats-row">
                   <div className="stat-box">
@@ -126,7 +185,7 @@ export const StudentModal = ({ student, onClose }) => {
                            color: currentBalance < 0 ? '#ff4d4f' : '#52c41a',
                         }}
                      >
-                        {currentBalance} ₽
+                        {currentBalance} PLN
                      </span>
                      <span className="txt">Баланс</span>
                   </div>
@@ -134,7 +193,7 @@ export const StudentModal = ({ student, onClose }) => {
                      <span className="num">
                         {lessonsLeft > 0 ? lessonsLeft : 0}
                      </span>
-                     <span className="txt">Осталось уроков</span>
+                     <span className="txt">Запас уроков</span>
                   </div>
                   <div className="stat-box">
                      <span className="num">{lessonsThisMonth.length}</span>

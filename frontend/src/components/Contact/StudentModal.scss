@@ -124,4 +124,73 @@
          }
       }
    }
+
+   .payment-form-container {
+      background: $secondary-bg;
+      padding: 16px;
+      border-radius: 16px;
+      margin-bottom: 16px;
+      overflow: hidden;
+
+      .payment-form-inputs {
+         display: flex;
+         gap: 12px;
+         margin-bottom: 16px;
+
+         .input-box {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+
+            label {
+               font-size: 11px;
+               color: $hint;
+               font-weight: 500;
+            }
+
+            input {
+               background: $bg;
+               border: 1px solid rgba($hint, 0.2);
+               color: $text;
+               padding: 10px;
+               border-radius: 10px;
+               font-size: 15px;
+               outline: none;
+
+               &:focus {
+                  border-color: $accent;
+               }
+            }
+         }
+      }
+
+      .payment-form-actions {
+         display: flex;
+         gap: 10px;
+
+         button {
+            flex: 1;
+            padding: 10px;
+            border-radius: 10px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+         }
+
+         .btn-cancel {
+            background: transparent;
+            color: $hint;
+         }
+
+         .btn-confirm {
+            background: $accent;
+            color: white;
+         }
+      }
+   }
 }

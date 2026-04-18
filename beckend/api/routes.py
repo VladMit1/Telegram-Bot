@@ -14,6 +14,8 @@ class LessonSchema(BaseModel):
 class ProgressUpdate(BaseModel):
     last_book: str = None
     last_page: int = None
+    total_paid: int = None
+    lesson_price: int = None
 @router.get("/contacts")
 def get_contacts():
     # Передаем токен, чтобы менеджер базы мог создать ссылки на фото
@@ -38,12 +40,14 @@ def create_lesson(data: LessonSchema):
 
 @router.patch("/contacts/{student_id}")
 def update_student_progress(student_id: int, data: ProgressUpdate):
-    # Метод в БД, который выполнит UPDATE contacts SET last_book = ?, last_page = ? WHERE id = ?
-    success = db.update_progress(
-        student_id, 
-        data.last_book, 
-        data.last_page
-    )
+    # Превращаем модель в словарь, исключая пустые поля
+    update_data = data.dict(exclude_unset=True)
+    
+    if not update_data:
+        return {"status": "no data to update"}, 400
+        
+    success = db.universal_update_contact(student_id, update_data)
+    
     if success:
         return {"status": "success"}
     return {"status": "error"}, 400
