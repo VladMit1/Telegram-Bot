@@ -16,7 +16,6 @@ class DBManager:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 
-                # 1. Создаем таблицу контактов (если её нет)
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS contacts (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,23 +28,26 @@ class DBManager:
                         last_page INTEGER DEFAULT 0,
                         balance INTEGER DEFAULT 0,
                         total_paid INTEGER DEFAULT 0,
-                        lesson_price INTEGER DEFAULT 500
+                        lesson_price INTEGER DEFAULT 500,
+                        username TEXT  -- ИЗМЕНЕНО: добавлено поле при создании
                     )
                 ''')
 
-                # 2. АВТО-МИГРАЦИЯ: Проверяем наличие колонок, если таблица уже существовала
                 cursor.execute("PRAGMA table_info(contacts)")
                 existing_columns = [column[1] for column in cursor.fetchall()]
                 
+                # ИЗМЕНЕНО: Авто-миграция для username
+                if 'username' not in existing_columns:
+                    print("🛠 Добавляю колонку username в таблицу contacts...")
+                    cursor.execute("ALTER TABLE contacts ADD COLUMN username TEXT")
+
                 if 'total_paid' not in existing_columns:
-                    print("🛠 Добавляю колонку total_paid в таблицу contacts...")
                     cursor.execute("ALTER TABLE contacts ADD COLUMN total_paid INTEGER DEFAULT 0")
                 
                 if 'lesson_price' not in existing_columns:
-                    print("🛠 Добавляю колонку lesson_price в таблицу contacts...")
                     cursor.execute("ALTER TABLE contacts ADD COLUMN lesson_price INTEGER DEFAULT 500")
 
-                # 3. Таблица уроков
+                # (Остальные CREATE TABLE остаются без изменений)
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS lessons (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,13 +73,13 @@ class DBManager:
         except Exception as e:
             print(f"❌ Ошибка БД при инициализации: {e}")
 
-    def add_contact(self, name, phone, photo_id, chat_id):
+    def add_contact(self, name, phone, photo_id, chat_id, username=None):
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    "INSERT INTO contacts (name, phone, photo_id, chat_id) VALUES (?, ?, ?, ?)",
-                    (name, phone, photo_id, chat_id)
+                    "INSERT INTO contacts (name, phone, photo_id, chat_id, username) VALUES (?, ?, ?, ?, ?)",
+                    (name, phone, photo_id, chat_id, username)
                 )
                 conn.commit()
                 return True
@@ -88,7 +90,12 @@ class DBManager:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT id, name, phone, strftime('%d.%m.%Y', created_at), photo_id FROM contacts ORDER BY id ASC")
+                # Мы берем id, name, phone, date, photo_id, и в конце добавляем все остальные поля для корректного индекса (11)
+                cursor.execute("""
+                    SELECT id, name, phone, strftime('%d.%m.%Y', created_at), photo_id, 
+                           chat_id, last_book, last_page, balance, total_paid, lesson_price, username 
+                    FROM contacts ORDER BY id ASC
+                """)
                 return cursor.fetchall()
         except: return []
 
@@ -98,11 +105,12 @@ class DBManager:
                 cursor = conn.cursor()
                 search_query = f"%{query}%"
                 cursor.execute("""
-                    SELECT id, name, phone, strftime('%d.%m.%Y', created_at), photo_id 
+                    SELECT id, name, phone, strftime('%d.%m.%Y', created_at), photo_id,
+                           chat_id, last_book, last_page, balance, total_paid, lesson_price, username
                     FROM contacts 
-                    WHERE name LIKE ? OR phone LIKE ?
+                    WHERE name LIKE ? OR phone LIKE ? OR username LIKE ?
                     ORDER BY id ASC
-                """, (search_query, search_query))
+                """, (search_query, search_query, search_query))
                 return cursor.fetchall()
         except: return []
 
@@ -147,17 +155,15 @@ class DBManager:
                                 photo_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
                         except: pass
 
-                    # ИСПРАВЛЕНО: Берем ПОЛНУЮ дату урока (YYYY-MM-DD)
                     cursor.execute("SELECT DISTINCT lesson_date FROM lessons WHERE student_id = ?", (row['id'],))
                     lesson_dates = [r[0] for r in cursor.fetchall()]
 
-                    # НОВОЕ: Берем платежи для этого студента
                     cursor.execute("SELECT id,amount, payment_date FROM payments WHERE student_id = ?", (row['id'],))
                     payments = [dict(p) for p in cursor.fetchall()]
 
                     student_dict = dict(row)
                     student_dict['photo_url'] = photo_url
-                    student_dict['attended_lessons'] = lesson_dates # Полные даты
+                    student_dict['attended_lessons'] = lesson_dates
                     student_dict['payments'] = payments
                     students.append(student_dict)
                 return students

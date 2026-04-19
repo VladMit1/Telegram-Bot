@@ -1,27 +1,34 @@
+import os
 import telebot
+from dotenv import load_dotenv
 from telebot import types
 import time
 from database.db_manager import db
-
-TOKEN = '8709390336:AAFjZsd1FTPOtBbvJEl5KSouwiZgawHMYyc'
+load_dotenv()
+TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN)
+
 
 welcome_msg_id = None
 search_results_ids = []
 
 def render_student_card(chat_id, student_data, is_search=False):
     # Данные из кортежа (индексы как в твоем коде)
+    student_id = student_data[0]
     name = student_data[1]
     phone = student_data[2]
     date_added = student_data[3] if len(student_data) > 3 else "Сегодня"
     photo_id = student_data[4] if len(student_data) > 4 else None
-    
+    web_app_url = f"https://vladmit1.github.io/Telegram-Bot/?studentId={student_id}"
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("💬 Написать", url=f"https://t.me/{phone}"),
         types.InlineKeyboardButton("🗑️ Удалить", callback_data=f"del_{phone}")
     )
-    markup.add(types.InlineKeyboardButton("📊 Статистика", callback_data=f"stats_{phone}"))
+    markup.add(types.InlineKeyboardButton(
+        "📊 Статистика", 
+        web_app=types.WebAppInfo(url=web_app_url)
+    ))
     if is_search:
         markup.add(types.InlineKeyboardButton("🔙 Назад к списку", callback_data="show_all"))
 
@@ -169,6 +176,3 @@ def handle_callbacks(call):
         if db.get_count() == 0:
             welcome_msg_id = None
             check_welcome_message(chat_id)
-
-    elif call.data.startswith('stats_'):
-        bot.answer_callback_query(call.id, "Статистика в Mini App")

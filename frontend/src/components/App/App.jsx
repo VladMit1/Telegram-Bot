@@ -1,33 +1,48 @@
-import { useState } from 'react';
-import { useGetContactsQuery } from '../../store/apiSlice';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react'
+import { useGetContactsQuery } from '../../store/apiSlice'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
    RefreshCw,
    Users,
    Calendar as CalendarIcon,
    Search,
-} from 'lucide-react';
-import { StudentCard } from '../Contacts/StudentCard';
-import { StudentModal } from '../Contact/StudentModal';
-import { Calendar } from '../Calendar/Calendar';
+} from 'lucide-react'
+import { StudentCard } from '../Contacts/StudentCard'
+import { StudentModal } from '../Contact/StudentModal'
+import { Calendar } from '../Calendar/Calendar'
 
 function App() {
-   const [view, setView] = useState('list');
-   const [searchQuery, setSearchQuery] = useState('');
-   const [selectedStudent, setSelectedStudent] = useState(null);
-   const [calendarContext, setCalendarContext] = useState(null);
+   const [view, setView] = useState('list')
+   const [searchQuery, setSearchQuery] = useState('')
+   const [selectedStudent, setSelectedStudent] = useState(null)
+   const [calendarContext, setCalendarContext] = useState(null)
 
    const {
       data: contacts = [],
       isLoading,
       isFetching,
       refetch,
-   } = useGetContactsQuery();
+   } = useGetContactsQuery()
+   useEffect(() => {
+      // 1. Получаем параметры из URL
+      const params = new URLSearchParams(window.location.search)
+      const studentIdFromUrl = params.get('studentId')
 
+      if (studentIdFromUrl && contacts.length > 0) {
+         // 2. Ищем ученика в загруженном списке
+         const student = contacts.find(
+            (c) => String(c.id) === String(studentIdFromUrl)
+         )
+
+         if (student) {
+            setSelectedStudent(student) // Открываем модалку
+         }
+      }
+   }, [contacts]) // Сработает, как только контакты загрузятся
    const navigateToCalendar = (student = null) => {
-      setCalendarContext(student);
-      setView('calendar');
-   };
+      setCalendarContext(student)
+      setView('calendar')
+   }
 
    return (
       <div className="app-container">
@@ -114,14 +129,14 @@ function App() {
                   student={selectedStudent}
                   onClose={() => setSelectedStudent(null)}
                   onSchedule={() => {
-                     const s = selectedStudent;
-                     setSelectedStudent(null);
-                     navigateToCalendar(s);
+                     const s = selectedStudent
+                     setSelectedStudent(null)
+                     navigateToCalendar(s)
                   }}
                />
             )}
          </AnimatePresence>
       </div>
-   );
+   )
 }
-export default App;
+export default App
