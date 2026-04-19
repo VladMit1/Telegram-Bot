@@ -32,7 +32,7 @@ def render_student_card(chat_id, student_data, is_search=False):
     if is_search:
         markup.add(types.InlineKeyboardButton("🔙 Назад к списку", callback_data="show_all"))
 
-    caption = f"👤 <b>Ученик:</b> {name}\n📱 <b>Телефон:</b> <code>{phone}</code>\n📅 <b>Добавлен:</b> {date_added}"
+    caption = f"🆔 <b>ИД:</b> {student_id}\n 👤 <b>Ученик:</b> {name}\n📱 <b>Телефон:</b> <code>{phone}</code>\n📅 <b>Добавлен:</b> {date_added}"
     
     try:
         if photo_id:
@@ -106,14 +106,15 @@ def handle_contact(message):
             except: pass
             welcome_msg_id = None
             
-        new_data = (None, name, c.phone_number, "Сегодня", photo_id)
-        msg_id = render_student_card(chat_id, new_data)
-        search_results_ids.append(msg_id)
-    else:
-        temp = bot.send_message(chat_id, f"ℹ️ {name} уже в списке.")
-        time.sleep(3)
-        try: bot.delete_message(chat_id, temp.message_id)
-        except: pass
+        # ВАЖНО: Берем данные ПРЯМО из базы, чтобы получить реальный ID
+        added_student = db.get_student_by_phone(c.phone_number)
+        
+        if added_student:
+            msg_id = render_student_card(chat_id, added_student)
+            search_results_ids.append(msg_id)
+        else:
+            # Если вдруг не нашли (на всякий случай)
+            bot.send_message(chat_id, "✅ Контакт сохранен!")
 
 @bot.message_handler(content_types=['text'])
 def handle_search_text(message):

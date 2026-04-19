@@ -268,4 +268,15 @@ class DBManager:
         except Exception as e:
             print(f"Ошибка удаления платежа: {e}")
             return False
+        
+    def get_student_by_phone(self, phone):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, name, phone, strftime('%d.%m.%Y', created_at), photo_id 
+                    FROM contacts WHERE phone = ?
+                """, (phone,))
+                return cursor.fetchone()
+        except: return None
 db = DBManager()

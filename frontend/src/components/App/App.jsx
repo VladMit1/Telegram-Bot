@@ -24,23 +24,36 @@ function App() {
       refetch,
    } = useGetContactsQuery()
    useEffect(() => {
+      // 1. Ждем, пока загрузка закончится и появятся данные
+      if (isLoading || contacts.length === 0) return
+
       const params = new URLSearchParams(window.location.search)
       const studentIdFromUrl = params.get('studentId')
 
-      if (studentIdFromUrl && contacts.length > 0) {
+      if (studentIdFromUrl) {
          const student = contacts.find(
             (c) => String(c.id) === String(studentIdFromUrl)
          )
-         console.log(student, studentIdFromUrl, contacts)
 
          if (student) {
-            // Оборачиваем в нулевой таймаут
-            setTimeout(() => {
+            // 2. Небольшая задержка, чтобы анимация списка успела инициализироваться
+            const timer = setTimeout(() => {
                setSelectedStudent(student)
-            }, 0)
+
+               // 3. ОПЦИОНАЛЬНО: Чистим URL, чтобы при обновлении страницы
+               // модалка не открывалась вечно (красивый UX)
+               const newUrl =
+                  window.location.protocol +
+                  '//' +
+                  window.location.host +
+                  window.location.pathname
+               window.history.replaceState({ path: newUrl }, '', newUrl)
+            }, 300)
+
+            return () => clearTimeout(timer)
          }
       }
-   }, [contacts])
+   }, [contacts, isLoading]) // Добавили isLoading сюда
    const navigateToCalendar = (student = null) => {
       setCalendarContext(student)
       setView('calendar')
