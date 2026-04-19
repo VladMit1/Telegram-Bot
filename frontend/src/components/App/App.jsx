@@ -22,7 +22,10 @@ function App() {
       isLoading,
       isFetching,
       refetch,
-   } = useGetContactsQuery()
+   } = useGetContactsQuery(undefined, {
+      refetchOnReconnect: true,
+      refetchOnMountOrArgChange: true,
+   })
    useEffect(() => {
       // 1. Ждем, пока загрузка закончится и появятся данные
       if (isLoading || contacts.length === 0) return
