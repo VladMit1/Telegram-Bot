@@ -24,21 +24,23 @@ function App() {
       refetch,
    } = useGetContactsQuery()
    useEffect(() => {
-      // 1. Получаем параметры из URL
       const params = new URLSearchParams(window.location.search)
       const studentIdFromUrl = params.get('studentId')
 
       if (studentIdFromUrl && contacts.length > 0) {
-         // 2. Ищем ученика в загруженном списке
          const student = contacts.find(
             (c) => String(c.id) === String(studentIdFromUrl)
          )
+         console.log(student, studentIdFromUrl, contacts)
 
          if (student) {
-            setSelectedStudent(student) // Открываем модалку
+            // Оборачиваем в нулевой таймаут
+            setTimeout(() => {
+               setSelectedStudent(student)
+            }, 0)
          }
       }
-   }, [contacts]) // Сработает, как только контакты загрузятся
+   }, [contacts])
    const navigateToCalendar = (student = null) => {
       setCalendarContext(student)
       setView('calendar')
