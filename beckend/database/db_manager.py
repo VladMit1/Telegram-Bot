@@ -72,7 +72,16 @@ class DBManager:
                 print("✅ База данных успешно инициализирована")
         except Exception as e:
             print(f"❌ Ошибка БД при инициализации: {e}")
-
+    def execute_query(self, query, params=()):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"Ошибка выполнения запроса: {e}")
+            return False
     def add_contact(self, name, phone, photo_id, chat_id, username=None):
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -123,14 +132,9 @@ class DBManager:
                 return res[0] if res else 0
         except: return 0
 
-    def delete_contact_by_phone(self, phone):
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM contacts WHERE phone = ?", (phone,))
-                conn.commit()
-                return True
-        except: return False
+    def delete_contact(self, contact_id):
+        query = "DELETE FROM contacts WHERE id = ?"
+        self.execute_query(query, (contact_id,))
 
     # Метод для React API
     def get_contacts_for_api(self, bot_token):
@@ -194,7 +198,7 @@ class DBManager:
                 return cursor.lastrowid # Возвращаем ID нового урока
         except sqlite3.Error as e:
             print(f"Ошибка БД: {e}")
-            return NoneS
+            return None
     def get_all_lessons(self):
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
