@@ -1,21 +1,23 @@
 from fastapi import APIRouter
+from fastapi import HTTPException
+from typing import Optional
 from database.db_manager import db
 from controller.bot_logic import TOKEN # Импортируем токен из логики бота
 from pydantic import BaseModel
 router = APIRouter()
 # Схема данных для валидации (чтобы Python понимал JSON)
 class LessonSchema(BaseModel):
-    student_id: int
-    date: str
-    time: str
+    student_id: int|None
+    date: str | None
+    time: str|None
     topic: str = "Урок"
     duration: int
 
 class ProgressUpdate(BaseModel):
-    last_book: str = None
-    last_page: int = None
-    total_paid: int = None
-    lesson_price: int = None
+    last_book: Optional[str] = None
+    last_page: Optional[int] = None
+    total_paid: Optional[int] = None
+    lesson_price: Optional[int] = None
 
 class PaymentSchema(BaseModel):
     student_id: int
@@ -40,10 +42,7 @@ def get_contacts():
     # Передаем токен, чтобы менеджер базы мог создать ссылки на фото
     return db.get_contacts_for_api(TOKEN)
 
-@router.delete("/contacts/{phone}")
-def delete_contact(phone: str):
-    db.delete_contact_by_phone(phone)
-    return {"status": "ok"}
+
 
 
 @router.post("/lessons")

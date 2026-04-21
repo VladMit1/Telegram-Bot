@@ -16,6 +16,7 @@ class DBManager:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 
+                # 1. Создаем основную таблицу, если её вообще нет
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS contacts (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,25 +30,31 @@ class DBManager:
                         balance INTEGER DEFAULT 0,
                         total_paid INTEGER DEFAULT 0,
                         lesson_price INTEGER DEFAULT 500,
-                        username TEXT  -- ИЗМЕНЕНО: добавлено поле при создании
+                        username TEXT
                     )
                 ''')
 
+                # 2. ПОЛНАЯ ПРОВЕРКА КОЛОНОК (Миграция)
+                # Это нужно, чтобы код не падал на разных компах
                 cursor.execute("PRAGMA table_info(contacts)")
                 existing_columns = [column[1] for column in cursor.fetchall()]
                 
-                # ИЗМЕНЕНО: Авто-миграция для username
-                if 'username' not in existing_columns:
-                    print("🛠 Добавляю колонку username в таблицу contacts...")
-                    cursor.execute("ALTER TABLE contacts ADD COLUMN username TEXT")
+                # Список того, что ДОЛЖНО быть в таблице
+                required_migrations = [
+                    ('username', 'TEXT'),
+                    ('total_paid', 'INTEGER DEFAULT 0'),
+                    ('lesson_price', 'INTEGER DEFAULT 500'),
+                    ('last_book', "TEXT DEFAULT 'Не выбрана'"),
+                    ('last_page', "INTEGER DEFAULT 0"),
+                    ('balance', "INTEGER DEFAULT 0")
+                ]
 
-                if 'total_paid' not in existing_columns:
-                    cursor.execute("ALTER TABLE contacts ADD COLUMN total_paid INTEGER DEFAULT 0")
-                
-                if 'lesson_price' not in existing_columns:
-                    cursor.execute("ALTER TABLE contacts ADD COLUMN lesson_price INTEGER DEFAULT 500")
+                for col_name, col_type in required_migrations:
+                    if col_name not in existing_columns:
+                        print(f"🛠 Миграция: Добавляю отсутствующую колонку {col_name}...")
+                        cursor.execute(f"ALTER TABLE contacts ADD COLUMN {col_name} {col_type}")
 
-                # (Остальные CREATE TABLE остаются без изменений)
+                # 3. Создаем связанные таблицы
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS lessons (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,6 +66,7 @@ class DBManager:
                         FOREIGN KEY (student_id) REFERENCES contacts (id)
                     )
                 ''')
+                
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS payments (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,8 +76,9 @@ class DBManager:
                         FOREIGN KEY (student_id) REFERENCES contacts (id)
                     )
                 ''')
+                
                 conn.commit()
-                print("✅ База данных успешно инициализирована")
+                print("✅ База данных полностью инициализирована и проверена")
         except Exception as e:
             print(f"❌ Ошибка БД при инициализации: {e}")
     def execute_query(self, query, params=()):
@@ -84,6 +93,14 @@ class DBManager:
             return False
     def add_contact(self, name, phone, photo_id, chat_id, username=None):
         try:
+            if not username and "@" in name:
+                parts = name.split()
+                # Находим слово с @
+                un = next((w for w in parts if w.startswith("@")), None)
+                if un:
+                    username = un
+                    # Убираем ник из имени
+                    name = " ".join([w for w in parts if w != un]).strip()
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute(

@@ -23,35 +23,39 @@ def get_main_markup():
     return markup
 
 def render_student_card(chat_id, student_data, is_search=False, show_add_button=False):
-    """Отрисовка карточки ученика с умной кнопкой связи"""
+    # Распаковка
     student_id, name, phone = student_data[0], student_data[1], student_data[2]
     date_added = student_data[3]
     photo_id = student_data[4]
     
+    # Пытаемся взять из 11-й колонки (username)
+    username = student_data[11] if len(student_data) > 11 else None
+
+    # !!! ВОТ ЭТОТ БЛОК НУЖЕН ДЛЯ ФИЛЛИПА !!!
+    # Если в колонке username пусто, но в имени есть собака - вытаскиваем ник
+    if (not username or username == "None") and "@" in str(name):
+        for word in name.split():
+            if word.startswith("@"):
+                username = word.replace('@', '') # Чистим от собаки для ссылки
+                break
+
     web_app_url = f"https://vladmit1.github.io/Telegram-Bot/?studentId={student_id}"
     markup = types.InlineKeyboardMarkup(row_width=2)
 
-    # ЕДИНАЯ ЛОГИКА КНОПКИ "НАПИСАТЬ"
+    # ЛОГИКА КНОПКИ
     chat_url = None
-    
-    # Пытаемся вытащить никнейм из любого поля
-    search_str = f"{name} {phone}"
-    if "@" in search_str:
-        for word in search_str.split():
-            if word.startswith("@"):
-                chat_url = f"https://t.me/{word.replace('@', '')}"
-                break
-    
-    # Если ника нет, используем номер (чистим от мусора)
-    if not chat_url and phone and not str(phone).startswith("id_") and phone != "no_phone":
+    if username and username != "None":
+        # Убираем собаку, если она осталась, для формирования ссылки
+        clean_user = str(username).replace('@', '')
+        chat_url = f"https://t.me/{clean_user}"
+    elif phone and not str(phone).startswith("id_"):
         clean_phone = "".join(filter(str.isdigit, str(phone)))
-        # Для международных номеров t.me/+7999... работает лучше всего
         chat_url = f"https://t.me/+{clean_phone}"
 
     if chat_url:
         markup.add(types.InlineKeyboardButton("💬 Написать", url=chat_url))
     
-    # Остальные кнопки
+    # Остальные кнопки...
     markup.add(
         types.InlineKeyboardButton("🗑️ Удалить", callback_data=f"del_{student_id}"),
         types.InlineKeyboardButton("📊 Статистика", web_app=types.WebAppInfo(url=web_app_url))
@@ -62,8 +66,13 @@ def render_student_card(chat_id, student_data, is_search=False, show_add_button=
     if show_add_button:
         markup.add(types.InlineKeyboardButton("➕ Добавить ученика", callback_data="add_student"))
 
+    # ФОРМИРОВАНИЕ ТЕКСТА
+    # Если username есть, выводим его отдельной строкой
+    user_display = f"🌐 <b>Username:</b> {username}\n" if username else ""
     display_phone = phone if phone and not str(phone).startswith("id_") else "Не указан"
+    
     caption = (f"👤 <b>Ученик:</b> {name}\n"
+               f"{user_display}"
                f"📱 <b>Телефон:</b> <code>{display_phone}</code>\n"
                f"📅 <b>Добавлен:</b> {date_added}")
     
@@ -108,32 +117,74 @@ def handle_start(message):
 def start_manual_add(call):
     bot.answer_callback_query(call.id)
     user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    # Если уже висит запрос ввода, удалим его перед новым
+    if user_id in user_data and 'last_msg' in user_data[user_id]:
+        try: bot.delete_message(chat_id, user_data[user_id]['last_msg'])
+        except: pass
     user_data[user_id] = {'step': 'waiting_name'} 
-    msg = bot.send_message(call.message.chat.id, "📝 <b>Введите данные:</b> (@username Имя)")
+    
+    # Создаем кнопку ОТМЕНА
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("❌ Отмена", callback_data="cancel_add"))
+    msg = bot.send_message(
+        call.message.chat.id, 
+        "📝 <b>Введите данные:</b> (@username Имя)", 
+        parse_mode="HTML",
+        reply_markup=markup
+    )
     user_data[user_id]['last_msg'] = msg.message_id
     bot.register_next_step_handler(msg, process_input)
+
+@bot.callback_query_handler(func=lambda call: call.data == "cancel_add")
+def cancel_add(call):
+    bot.answer_callback_query(call.id)
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    
+    # Удаляем только сообщение с вводом
+    if user_id in user_data and 'last_msg' in user_data[user_id]:
+        try: bot.delete_message(chat_id, user_data[user_id]['last_msg'])
+        except: pass
+        del user_data[user_id]
 
 def process_input(message):
     chat_id = message.chat.id
     user_id = message.from_user.id
+    
+    if user_id not in user_data: return
+
+    # Удаляем то, что написал пользователь (чтобы не мусорить в чате)
     try: bot.delete_message(chat_id, message.message_id)
     except: pass
-    if user_id in user_data and 'last_msg' in user_data[user_id]:
+
+    # Удаляем сообщение "Введите данные"
+    if 'last_msg' in user_data[user_id]:
         try: bot.delete_message(chat_id, user_data[user_id]['last_msg'])
         except: pass
 
+    # Если ввели команду вместо текста
     if not message.text or message.text.startswith('/'):
-        if message.text == '/start': handle_start(message)
+        if message.text == '/start': 
+            del user_data[user_id]
+            handle_start(message)
         return
 
     user_data[user_id]['temp_name'] = message.text
+    
     markup = types.InlineKeyboardMarkup()
     markup.add(
         types.InlineKeyboardButton("✅ Утвердить", callback_data="confirm_save"),
-        types.InlineKeyboardButton("🔄 Исправить", callback_data="add_student")
+        types.InlineKeyboardButton("🔄 Исправить", callback_data="add_student"),
+        types.InlineKeyboardButton("❌ Отмена", callback_data="cancel_add")
     )
-    msg = bot.send_message(chat_id, f"🧐 <b>Записать так?</b>\n<code>{message.text}</code>", 
-                           reply_markup=markup, parse_mode="HTML")
+    
+    msg = bot.send_message(
+        chat_id, 
+        f"🧐 <b>Записать так?</b>\n<code>{message.text}</code>", 
+        reply_markup=markup, 
+        parse_mode="HTML"
+    )
     user_data[user_id]['last_msg'] = msg.message_id
 
 @bot.callback_query_handler(func=lambda call: call.data == "confirm_save")
