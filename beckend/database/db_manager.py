@@ -29,7 +29,7 @@ class DBManager:
                         last_page INTEGER DEFAULT 0,
                         balance INTEGER DEFAULT 0,
                         total_paid INTEGER DEFAULT 0,
-                        lesson_price INTEGER DEFAULT 500,
+                        lesson_price INTEGER DEFAULT 50,
                         username TEXT
                     )
                 ''')
@@ -43,7 +43,7 @@ class DBManager:
                 required_migrations = [
                     ('username', 'TEXT'),
                     ('total_paid', 'INTEGER DEFAULT 0'),
-                    ('lesson_price', 'INTEGER DEFAULT 500'),
+                    ('lesson_price', 'INTEGER DEFAULT 50'),
                     ('last_book', "TEXT DEFAULT 'Не выбрана'"),
                     ('last_page', "INTEGER DEFAULT 0"),
                     ('balance', "INTEGER DEFAULT 0")
@@ -266,7 +266,7 @@ class DBManager:
                 # 1. Записываем платеж
                 cursor.execute("INSERT INTO payments (student_id, amount, payment_date) VALUES (?, ?, ?)", (student_id, amount, date))
                 # 2. Обновляем общий счетчик в контактах
-                cursor.execute("UPDATE contacts SET total_paid = total_paid + ? WHERE id = ?", (amount, student_id))
+                cursor.execute("UPDATE contacts SET balance = balance + ? WHERE id = ?", (amount, student_id))
                 conn.commit()
                 return True
         except Exception as e:

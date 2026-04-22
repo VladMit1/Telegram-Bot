@@ -23,58 +23,70 @@ def get_main_markup():
     return markup
 
 def render_student_card(chat_id, student_data, is_search=False, show_add_button=False):
-    # Распаковка
-    student_id, name, phone = student_data[0], student_data[1], student_data[2]
+    # Распаковка индексов (согласно твоей схеме БД):
+    # 0:id, 1:name, 2:phone, 3:date, 8:balance, 10:lesson_price, 11:username
+    student_id = student_data[0]
+    name = student_data[1]
+    phone = student_data[2]
     date_added = student_data[3]
     photo_id = student_data[4]
-    
-    # Пытаемся взять из 11-й колонки (username)
+    total_paid = student_data[9] if len(student_data) > 9 else 0
+    balance = student_data[8] if len(student_data) > 8 else 0
+    lesson_price = student_data[10] if len(student_data) > 10 else 0
     username = student_data[11] if len(student_data) > 11 else None
 
-    # !!! ВОТ ЭТОТ БЛОК НУЖЕН ДЛЯ ФИЛЛИПА !!!
-    # Если в колонке username пусто, но в имени есть собака - вытаскиваем ник
+    # --- ЛОГИКА ФИНАНСОВОГО ИНДИКАТОРА ---
+    if balance > 0:
+        status_emoji = "🟢"
+        status_text = "Оплачено"
+    elif balance == 0:
+        status_emoji = "🟡"
+        status_text = "Пора оплатить"
+    else:
+        status_emoji = "🔴"
+        status_text = f"Долг: {abs(balance)}PLN" # abs превращает -500 в 500
+
+    # Обработка username (для Филлипа и кнопки)
     if (not username or username == "None") and "@" in str(name):
         for word in name.split():
             if word.startswith("@"):
-                username = word.replace('@', '') # Чистим от собаки для ссылки
+                username = word.replace('@', '')
                 break
 
-    web_app_url = f"https://vladmit1.github.io/Telegram-Bot/?studentId={student_id}"
-    markup = types.InlineKeyboardMarkup(row_width=2)
-
-    # ЛОГИКА КНОПКИ
+    # Ссылка для связи
     chat_url = None
     if username and username != "None":
-        # Убираем собаку, если она осталась, для формирования ссылки
-        clean_user = str(username).replace('@', '')
-        chat_url = f"https://t.me/{clean_user}"
+        chat_url = f"https://t.me/{str(username).replace('@', '')}"
     elif phone and not str(phone).startswith("id_"):
         clean_phone = "".join(filter(str.isdigit, str(phone)))
         chat_url = f"https://t.me/+{clean_phone}"
 
+    # Кнопки
+    markup = types.InlineKeyboardMarkup(row_width=2)
     if chat_url:
         markup.add(types.InlineKeyboardButton("💬 Написать", url=chat_url))
     
-    # Остальные кнопки...
     markup.add(
         types.InlineKeyboardButton("🗑️ Удалить", callback_data=f"del_{student_id}"),
-        types.InlineKeyboardButton("📊 Статистика", web_app=types.WebAppInfo(url=web_app_url))
+        types.InlineKeyboardButton("📊 Статистика", web_app=types.WebAppInfo(url=f"https://vladmit1.github.io/Telegram-Bot/?studentId={student_id}"))
     )
     
     if is_search:
-        markup.add(types.InlineKeyboardButton("🔙 Назад к списку", callback_data="show_all"))
+        markup.add(types.InlineKeyboardButton("🔙 Назад", callback_data="show_all"))
     if show_add_button:
         markup.add(types.InlineKeyboardButton("➕ Добавить ученика", callback_data="add_student"))
 
     # ФОРМИРОВАНИЕ ТЕКСТА
-    # Если username есть, выводим его отдельной строкой
-    user_display = f"🌐 <b>Username:</b> {username}\n" if username else ""
+    user_display = f"🌐 <b>Username:</b> @{str(username).replace('@', '')}\n" if username else ""
     display_phone = phone if phone and not str(phone).startswith("id_") else "Не указан"
     
+    # Добавляем строку финансового состояния
     caption = (f"👤 <b>Ученик:</b> {name}\n"
                f"{user_display}"
                f"📱 <b>Телефон:</b> <code>{display_phone}</code>\n"
-               f"📅 <b>Добавлен:</b> {date_added}")
+               f"📅 <b>Добавлен:</b> {date_added}\n"
+               f"──────────────────\n"
+               f"{status_emoji} <b>Статус:</b> {status_text} (Баланс: {balance}PLN)")
     
     try:
         if photo_id:
