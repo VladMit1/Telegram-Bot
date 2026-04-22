@@ -25,7 +25,7 @@ export const PaymentBlock = ({ student, studentHistory }) => {
    );
    // 2. Актуальный баланс (Оплаты минус только совершенные уроки)
    const currentBalance =
-      student.total_paid - conductedLessons.length * student.lesson_price;
+      student.balance - conductedLessons.length * student.lesson_price;
    // 3. Будущие уроки
    const futureLessonsCount = studentHistory.filter(
       (h) => h.type === 'lesson' && h.date > todayStr
