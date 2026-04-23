@@ -23,22 +23,35 @@ export const StudentModal = ({ student: initialStudent, onClose }) => {
 
    // ГЛАВНОЕ: Смешиваем уроки и платежи
    const studentHistory = useMemo(() => {
-      // 1. Уроки (делаем копию через [...allLessons] перед сортировкой)
+      // 1. Считаем общую сумму всех оплат
+      const totalPaidSum = (student.payments || []).reduce(
+         (sum, p) => sum + p.amount,
+         0
+      );
+
+      // 2. Обрабатываем уроки
       const lessons = [...allLessons]
          .filter((l) => String(l.student_id) === String(student.id))
-         .sort((a, b) => a.lesson_date.localeCompare(b.lesson_date)) // Теперь не упадет!
-         .map((l, idx) => {
-            const isConducted = l.lesson_date <= todayStr;
+         .sort((a, b) => a.lesson_date.localeCompare(b.lesson_date))
+         .map((l, index) => {
+            const price = student.lesson_price;
+
+            // Считаем, сколько денег потребуют все уроки ОТ начала ДО текущего (включительно)
+            const cumulativeCost = (index + 1) * price;
+
+            // Урок оплачен, если общая сумма оплат покрывает его стоимость в очереди
+            const isPaid = totalPaidSum >= cumulativeCost;
+
             return {
                ...l,
                type: 'lesson',
                date: l.lesson_date,
-               is_conducted: isConducted,
-               is_paid: student.total_paid >= (idx + 1) * student.lesson_price,
+               is_conducted: l.lesson_date <= todayStr,
+               is_paid: isPaid,
             };
          });
 
-      // 2. Платежи (берем payment_date, который мы настроили в БД)
+      // 3. Платежи
       const payments = (student.payments || []).map((p) => ({
          id: p.id,
          date: p.payment_date || p.date,
@@ -46,10 +59,8 @@ export const StudentModal = ({ student: initialStudent, onClose }) => {
          amount: p.amount,
       }));
 
-      // Объединяем и фильтруем возможные пустые даты
       return [...lessons, ...payments].filter((event) => event.date);
-   }, [allLessons, student]);
-
+   }, [allLessons, student, todayStr]); // Не забудь добавить todayStr в зависимости
    return (
       <div className="modal-overlay" onClick={onClose}>
          <motion.div

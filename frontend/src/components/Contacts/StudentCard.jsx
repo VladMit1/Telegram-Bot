@@ -8,22 +8,15 @@ export const StudentCard = ({ student, onOpen, onSchedule }) => {
    const currentDay = moment().date();
    const todayStr = moment().format('YYYY-MM-DD');
    const price = Number(student.lesson_price) || 0;
-   const paid = Number(student.total_paid) || 0;
+   const balance = Number(student.balance) || 0;
 
-   // 1. Считаем проведенные уроки (<= сегодня)
-   const conductedCount = allLessons.filter(
-      (l) =>
-         String(l.student_id) === String(student.id) &&
-         l.lesson_date <= todayStr
-   ).length;
-
-   // 2. Считаем будущие уроки (> сегодня)
+   // 1. Считаем будущие уроки (> сегодня)
    const futureCount = allLessons.filter(
       (l) =>
          String(l.student_id) === String(student.id) && l.lesson_date > todayStr
    ).length;
 
-   const currentBalance = paid - conductedCount * price;
+   const currentBalance = balance;
 
    // ОПРЕДЕЛЯЕМ СТАТУС
    let balanceStatus = 'positive';

@@ -16,7 +16,7 @@ class LessonSchema(BaseModel):
 class ProgressUpdate(BaseModel):
     last_book: Optional[str] = None
     last_page: Optional[int] = None
-    total_paid: Optional[int] = None
+    balance: Optional[int] = None
     lesson_price: Optional[int] = None
 
 class PaymentSchema(BaseModel):

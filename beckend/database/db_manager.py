@@ -28,7 +28,6 @@ class DBManager:
                         last_book TEXT DEFAULT 'Не выбрана',
                         last_page INTEGER DEFAULT 0,
                         balance INTEGER DEFAULT 0,
-                        total_paid INTEGER DEFAULT 0,
                         lesson_price INTEGER DEFAULT 50,
                         username TEXT
                     )
@@ -42,7 +41,6 @@ class DBManager:
                 # Список того, что ДОЛЖНО быть в таблице
                 required_migrations = [
                     ('username', 'TEXT'),
-                    ('total_paid', 'INTEGER DEFAULT 0'),
                     ('lesson_price', 'INTEGER DEFAULT 50'),
                     ('last_book', "TEXT DEFAULT 'Не выбрана'"),
                     ('last_page', "INTEGER DEFAULT 0"),
@@ -119,7 +117,7 @@ class DBManager:
                 # Мы берем id, name, phone, date, photo_id, и в конце добавляем все остальные поля для корректного индекса (11)
                 cursor.execute("""
                     SELECT id, name, phone, strftime('%d.%m.%Y', created_at), photo_id, 
-                           chat_id, last_book, last_page, balance, total_paid, lesson_price, username 
+                           chat_id, last_book, last_page, balance, lesson_price, username 
                     FROM contacts ORDER BY id ASC
                 """)
                 return cursor.fetchall()
@@ -132,7 +130,7 @@ class DBManager:
                 search_query = f"%{query}%"
                 cursor.execute("""
                     SELECT id, name, phone, strftime('%d.%m.%Y', created_at), photo_id,
-                           chat_id, last_book, last_page, balance, total_paid, lesson_price, username
+                           chat_id, last_book, last_page, balance, lesson_price, username
                     FROM contacts 
                     WHERE name LIKE ? OR phone LIKE ? OR username LIKE ?
                     ORDER BY id ASC
@@ -211,6 +209,13 @@ class DBManager:
                     INSERT INTO lessons (student_id, lesson_date, lesson_time, topic, duration)
                     VALUES (?, ?, ?, ?, ?)
                 ''', (student_id, date, time, topic, duration))
+                # 2. СПИСЫВАЕМ ДЕНЬГИ
+                # Мы вычитаем lesson_price из balance
+                cursor.execute("""
+                    UPDATE contacts 
+                    SET balance = balance - lesson_price 
+                    WHERE id = ?
+                """, (student_id,))
                 conn.commit()
                 return cursor.lastrowid # Возвращаем ID нового урока
         except sqlite3.Error as e:
@@ -253,6 +258,15 @@ class DBManager:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM lessons WHERE id = ?", (lesson_id,))
+                # 2. СПИСЫВАЕМ ДЕНЬГИ
+                # Мы вычитаем lesson_price из balance
+                cursor.execute("""
+                    UPDATE contacts 
+                    SET balance = balance + lesson_price 
+                    WHERE id IN (
+                        SELECT student_id FROM lessons WHERE id = ?
+                    )
+                """, (lesson_id,))
                 conn.commit()
                 # Возвращаем True, если хотя бы одна строка была удалена
                 return cursor.rowcount > 0
@@ -281,7 +295,7 @@ class DBManager:
                 cursor.execute("DELETE FROM payments WHERE id = ?", (payment_id,))
                 # 2. Вычитаем сумму из общего баланса студента
                 cursor.execute(
-                    "UPDATE contacts SET total_paid = total_paid - ? WHERE id = ?",
+                    "UPDATE contacts SET balance = balance - ? WHERE id = ?",
                     (amount, student_id)
                 )
                 conn.commit()

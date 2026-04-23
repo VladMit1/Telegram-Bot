@@ -3,8 +3,18 @@ import telebot
 from dotenv import load_dotenv
 from telebot import types
 import time
+from service.finance_manager import FinanceManager
 from database.db_manager import db 
+# 1. Определяем путь к текущей папке, где лежит этот bot.py
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# 2. Собираем путь к базе. 
+# Если база лежит в корне проекта, а бот в подпапке, то '..', 'tracker.db'
+# Если база лежит в той же папке, что и бот, то просто 'tracker.db'
+DB_PATH = os.path.join(BASE_DIR, "..", "tracker.db") 
+
+# 3. Передаем нормальный путь в менеджер
+finance = FinanceManager(DB_PATH)
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
@@ -30,22 +40,11 @@ def render_student_card(chat_id, student_data, is_search=False, show_add_button=
     phone = student_data[2]
     date_added = student_data[3]
     photo_id = student_data[4]
-    total_paid = student_data[9] if len(student_data) > 9 else 0
-    balance = student_data[8] if len(student_data) > 8 else 0
-    lesson_price = student_data[10] if len(student_data) > 10 else 0
-    username = student_data[11] if len(student_data) > 11 else None
-
+    username = student_data[10] if len(student_data) > 10 else None
+    
     # --- ЛОГИКА ФИНАНСОВОГО ИНДИКАТОРА ---
-    if balance > 0:
-        status_emoji = "🟢"
-        status_text = "Оплачено"
-    elif balance == 0:
-        status_emoji = "🟡"
-        status_text = "Пора оплатить"
-    else:
-        status_emoji = "🔴"
-        status_text = f"Долг: {abs(balance)}PLN" # abs превращает -500 в 500
-
+    balance = finance.get_actual_balance(student_id)
+    status_emoji, status_text = finance.get_financial_status(student_id, balance)
     # Обработка username (для Филлипа и кнопки)
     if (not username or username == "None") and "@" in str(name):
         for word in name.split():
@@ -86,7 +85,7 @@ def render_student_card(chat_id, student_data, is_search=False, show_add_button=
                f"📱 <b>Телефон:</b> <code>{display_phone}</code>\n"
                f"📅 <b>Добавлен:</b> {date_added}\n"
                f"──────────────────\n"
-               f"{status_emoji} <b>Статус:</b> {status_text} (Баланс: {balance}PLN)")
+               f"{status_emoji} <b>Статус:</b> {status_text}")
     
     try:
         if photo_id:

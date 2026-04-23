@@ -20,13 +20,14 @@ export const PaymentBlock = ({ student, studentHistory }) => {
    const [payDate, setPayDate] = useState(moment().format('YYYY-MM-DD'));
    const todayStr = moment().format('YYYY-MM-DD');
    // 1. Считаем ТОЛЬКО проведенные уроки (дата <= сегодня)
+   const currentBalance = student.balance;
+
+   // 2. Считаем ТОЛЬКО проведенные уроки (для статистики или других нужд, если надо)
    const conductedLessons = studentHistory.filter(
       (h) => h.type === 'lesson' && h.date <= todayStr
    );
-   // 2. Актуальный баланс (Оплаты минус только совершенные уроки)
-   const currentBalance =
-      student.balance - conductedLessons.length * student.lesson_price;
-   // 3. Будущие уроки
+
+   // 3. Будущие уроки (оставляем как есть для инфо-блока)
    const futureLessonsCount = studentHistory.filter(
       (h) => h.type === 'lesson' && h.date > todayStr
    ).length;
