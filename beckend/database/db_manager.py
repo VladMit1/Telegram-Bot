@@ -201,26 +201,21 @@ class DBManager:
                 conn.commit()
                 return True
         except: return False
-    def add_lesson(self, student_id, date, time, topic, duration):
+    def add_lesson(self, student_id, date, time, topic="Урок", duration=60):
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
+                # 1. Просто добавляем урок. Никаких UPDATE баланса!
                 cursor.execute('''
                     INSERT INTO lessons (student_id, lesson_date, lesson_time, topic, duration)
                     VALUES (?, ?, ?, ?, ?)
                 ''', (student_id, date, time, topic, duration))
-                # 2. СПИСЫВАЕМ ДЕНЬГИ
-                # Мы вычитаем lesson_price из balance
-                cursor.execute("""
-                    UPDATE contacts 
-                    SET balance = balance - lesson_price 
-                    WHERE id = ?
-                """, (student_id,))
+            
                 conn.commit()
-                return cursor.lastrowid # Возвращаем ID нового урока
+                return cursor.lastrowid 
         except sqlite3.Error as e:
-            print(f"Ошибка БД: {e}")
-            return None
+            print(f"❌ Ошибка БД при добавлении урока: {e}")
+        return None
     def get_all_lessons(self):
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -314,4 +309,49 @@ class DBManager:
                 """, (phone,))
                 return cursor.fetchone()
         except: return None
+
+    def get_busy_days(self, student_id, year, month):
+    # Формируем строку месяца для поиска "YYYY-MM"
+        month_str = f"{year}-{str(month).zfill(2)}%"
+        query = "SELECT DISTINCT lesson_date FROM lessons WHERE student_id  = ? AND lesson_date LIKE ?"
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (student_id, month_str))
+                # Получаем список дат и вытаскиваем только день (последние  две цифры)
+                results = cursor.fetchall()
+                return [int(row[0].split('-')[2]) for row in results]
+        except:
+            return []
+        
+    def get_booked_times(self, student_id, date_str):
+        """Возвращает список забронированных времен (строки типа '09:00')"""
+        query = "SELECT lesson_time FROM lessons WHERE student_id = ? AND   lesson_date = ?"
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (student_id, date_str))
+                results = cursor.fetchall()
+                return [row[0] for row in results] # Получим список     ['09:00', '14:00']
+        except:
+            return []
+        
+    def get_booked_times_with_names(self, date_str):
+        """Возвращает словарь вида {'09:00': 'Имя Ученика', '11:00': 'Другой    Ученик'}"""
+        query = """
+            SELECT l.lesson_time, c.name 
+            FROM lessons l
+            JOIN contacts c ON l.student_id = c.id
+            WHERE l.lesson_date = ?
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, (date_str,))
+                results = cursor.fetchall()
+                # Превращаем список кортежей в удобный словарь
+                return {row[0]: row[1] for row in results}
+        except Exception as e:
+            print(f"Ошибка получения расписания: {e}")
+            return {}
 db = DBManager()

@@ -1,23 +1,31 @@
 import threading
 import uvicorn
+import telebot
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from controller.bot_logic import bot
+
+# Импорты
+from config import TOKEN, DB_PATH
+from service.finance_manager import FinanceManager
+from controller.bot_logic import register_handlers
 from api.routes import router
 
+if not TOKEN:
+    raise ValueError("❌ BOT_TOKEN не найден в .env!")
+# 1. Инициализация объектов
+bot = telebot.TeleBot(TOKEN)
+finance = FinanceManager(DB_PATH)
+
+# 2. Регистрация логики бота
+register_handlers(bot, finance)
+
+# 3. Настройка FastAPI
 app = FastAPI()
 
-# 1. Вместо "*" лучше явно прописать адреса, 
-# либо убрать allow_credentials=True, если оно тебе не нужно.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://vladmit1.github.io",
-        "https://tracker.vladmit.org"
-    ],
-    allow_credentials=True, # Если это True, origins не может быть ["*"]
+    allow_origins=["*"], # На время тестов можно оставить так
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -25,12 +33,13 @@ app.add_middleware(
 app.include_router(router, prefix="/api")
 
 def run_bot():
-    # Важный момент: если на первом компе бот работает через Webhook, 
-    # то здесь polling может выбивать того бота. 
-    # Убедись, что токены РАЗНЫЕ.
-    print("🤖 Бот запущен (Long Polling)...")
+    print("🤖 Бот запущен...")
     bot.polling(none_stop=True)
 
 if __name__ == "__main__":
+    # Запуск бота в потоке
     threading.Thread(target=run_bot, daemon=True).start()
+    
+    # Запуск FastAPI
+    print(f"🚀 API доступно на порту 8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)

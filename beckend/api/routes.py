@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from fastapi import HTTPException
 from typing import Optional
 from database.db_manager import db
-from controller.bot_logic import TOKEN # Импортируем токен из логики бота
+from config import TOKEN # Импортируем токен из логики бота
 from pydantic import BaseModel
 router = APIRouter()
 # Схема данных для валидации (чтобы Python понимал JSON)
@@ -23,6 +23,11 @@ class PaymentSchema(BaseModel):
     student_id: int
     amount: int
     date: str
+
+@router.get("/status")
+def get_status():
+    return {"status": "ok", "bot_token_configured": bool(TOKEN)}
+
 
 @router.post("/payments")
 def create_payment(data: PaymentSchema):
