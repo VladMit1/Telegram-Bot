@@ -268,19 +268,24 @@ class DBManager:
         except Exception as e:
             print(f"Ошибка при удалении занятия {lesson_id}: {e}")
             return False
-    def add_payment(self, student_id, amount, date):
+    def add_payment(self, student_id, amount, payment_date):
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                # 1. Записываем платеж
-                cursor.execute("INSERT INTO payments (student_id, amount, payment_date) VALUES (?, ?, ?)", (student_id, amount, date))
-                # 2. Обновляем общий счетчик в контактах
-                cursor.execute("UPDATE contacts SET balance = balance + ? WHERE id = ?", (amount, student_id))
+                # Используем правильное имя колонки payment_date из твоего  PRAGMA
+                cursor.execute("""
+                    INSERT INTO payments (student_id, amount, payment_date) 
+                    VALUES (?, ?, ?)
+                """, (student_id, amount, payment_date))
+
+                # Сразу обновляем баланс в таблице contacts (опционально,   если ты его там хранишь)
+                cursor.execute("""
+                    UPDATE contacts SET balance = balance + ? WHERE id = ?
+                """, (amount, student_id))
+
                 conn.commit()
-                return True
         except Exception as e:
             print(f"Ошибка при записи платежа: {e}")
-            return False
     def delete_payment(self, payment_id, student_id, amount):
         print(f"Удаление платежа ID {payment_id} для студента {student_id} на сумму {amount}")
         try:
@@ -299,14 +304,11 @@ class DBManager:
             print(f"Ошибка удаления платежа: {e}")
             return False
         
-    def get_student_by_phone(self, phone):
+    def get_by_id(self, student_id):
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT id, name, phone, strftime('%d.%m.%Y', created_at), photo_id 
-                    FROM contacts WHERE phone = ?
-                """, (phone,))
+                cursor.execute("SELECT * FROM contacts WHERE id = ?", (student_id,))
                 return cursor.fetchone()
         except: return None
 
@@ -354,4 +356,13 @@ class DBManager:
         except Exception as e:
             print(f"Ошибка получения расписания: {e}")
             return {}
+    def get_payment_dates(self, student_id):
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                # Выбираем даты из колонки payment_date
+                cursor.execute("SELECT DISTINCT payment_date FROM payments  WHERE student_id = ?", (student_id,))
+                return [row[0] for row in cursor.fetchall()]
+        except:
+            return []
 db = DBManager()

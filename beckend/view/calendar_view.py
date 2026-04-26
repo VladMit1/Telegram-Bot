@@ -3,11 +3,13 @@ from datetime import datetime
 from telebot import types
 from database.db_manager import db # Импортируем базу
 
-def create_calendar(student_id, year=None, month=None):
+def create_calendar(student_id, year=None, month=None , mode="view", highlight_dates=None):
     now = datetime.now()
     curr_year = year or now.year
     curr_month = month or now.month
-
+    # Если список дат не передан, делаем пустым
+    if highlight_dates is None:
+        highlight_dates = []
 		# Получаем дни с занятиями
     busy_days = db.get_busy_days(student_id, curr_year, curr_month)
     markup = types.InlineKeyboardMarkup(row_width=7)
@@ -32,14 +34,31 @@ def create_calendar(student_id, year=None, month=None):
             if day == 0:
                 row.append(types.InlineKeyboardButton(" ", callback_data="ignore"))
             else:
-                # Если в этот день есть занятие — добавляем точку или эмодзи
-                prefix = "🔹 " if day in busy_days else ""
-                # Если это сегодня — можно пометить по-другому
-                if day == now.day and curr_month == now.month and curr_year == now.year:
+               # ФОРМИРУЕМ ТЕКСТ КНОПКИ
+                date_str = f"{curr_year}-{curr_month:02d}-{day:02d}"
+                prefix = ""
+                
+                if mode == "pay":
+                    # Если в этот день была оплата — ставим монетку
+                    if date_str in highlight_dates:
+                        prefix = "💰 "
+                else:
+                    # Если режим обычный — ставим точку занятия
+                    if day in busy_days:
+                        prefix = "🔹 "
+                
+                # Пометка сегодняшнего дня (если нет монетки/занятия)
+                if day == now.day and curr_month == now.month and curr_year == now.year and not prefix:
                     prefix = "📍 "
                 
                 btn_text = f"{prefix}{day}"
-                callback = f"cal_day_{student_id}_{curr_year}_{curr_month}_{day}"
+                
+                # CALLBACK меняется в зависимости от режима
+                if mode == "pay":
+                    callback = f"pay_date_{student_id}_{date_str}"
+                else:
+                    callback = f"cal_day_{student_id}_{curr_year}_{curr_month}_{day}"
+                    
                 row.append(types.InlineKeyboardButton(btn_text, callback_data=callback))
         markup.row(*row)
 
