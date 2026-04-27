@@ -41,6 +41,28 @@ def register_student_handlers(bot, db, state_data, ui_refs):
         bot.answer_callback_query(call.id, "🗑️ Удалено")
         ui_refs['handle_start'](call.message)
 
+    @bot.message_handler(content_types=['contact'])
+    def handle_contact_object(message):
+        chat_id = message.chat.id
+        
+        # Вытаскиваем данные из карточки
+        phone = message.contact.phone_number
+        first_name = message.contact.first_name
+        last_name = message.contact.last_name or ""
+        full_name = f"{first_name} {last_name}".strip()
+        username = "None" # В карточке контакта username обычно не передается
+
+        # Сохраняем в базу
+        db.add_contact(full_name, phone, None, chat_id, username)
+        
+        # Сбрасываем шаги и обновляем экран
+        user_id = message.from_user.id
+        if user_id in state_data:
+            state_data[user_id]['step'] = None
+            
+        # Возвращаемся на главный экран
+        ui_refs['handle_start'](message)
+
 def handle_student_text(bot, db, message, user_data, ui_refs):
     user_id = message.from_user.id
     chat_id = message.chat.id
