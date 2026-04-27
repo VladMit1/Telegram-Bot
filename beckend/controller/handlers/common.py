@@ -1,5 +1,6 @@
 from telebot import types
 from view.student_render import render_student_card, get_main_markup
+from view.calendar_view import create_calendar  # НЕ ЗАБУДЬ ЭТОТ ИМПОРТ
 
 def register_common_handlers(bot, db, finance, state_data, ui_refs):
     
@@ -12,7 +13,6 @@ def register_common_handlers(bot, db, finance, state_data, ui_refs):
         try: bot.delete_message(chat_id, message.message_id)
         except: pass
         
-        # Очистка через центральную функцию
         ui_refs['clear_screen'](chat_id)
         
         contacts = db.get_all()
@@ -35,4 +35,38 @@ def register_common_handlers(bot, db, finance, state_data, ui_refs):
             state_data[user_id]['step'] = None
         handle_start(call.message)
 
-    return handle_start  # Возвращаем функцию для внешнего вызова
+    # ОБРАБОТЧИК НАВИГАЦИИ (Теперь ВНУТРИ функции регистрации)
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("cal_nav_"))
+    def handle_calendar_navigation(call):
+        params = call.data.split("_")
+        student_id = params[2]
+        mode = params[3]
+        year = int(params[4])
+        month = int(params[5])
+
+        highlight_dates = None
+        if mode == "pay":
+            highlight_dates = db.get_payment_dates(student_id)
+
+        markup = create_calendar(
+            student_id=student_id, 
+            year=year, 
+            month=month, 
+            mode=mode, 
+            highlight_dates=highlight_dates
+        )
+
+        text = "💳 <b>Финансовый календарь:</b>" if mode == "pay" else "📅 <b>Расписание занятий:</b>"
+
+        try:
+            bot.edit_message_text(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                text=text,
+                reply_markup=markup,
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+
+    return handle_start  # ТЕПЕРЬ RETURN В САМОМ КОНЦЕ

@@ -6,35 +6,59 @@ class FinanceManager:
         self.db_path = db_path
 
     def _get_today(self):
-        # Получаем дату в формате ГГГГ-ММ-ДД по местному времени
         return datetime.now().strftime('%Y-%m-%d')
 
     def get_actual_balance(self, student_id):
-        today = self._get_today()
-        query = """
-        SELECT 
-            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = ?) -
-            (SELECT COALESCE(COUNT(*), 0) * c.lesson_price 
-             FROM lessons l 
-             JOIN contacts c ON l.student_id = c.id 
-             WHERE l.student_id = ? AND l.lesson_date <= ?)
-        FROM contacts c
-        WHERE c.id = ?
-        """
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                # Передаем today третьим параметром
-                cursor.execute(query, (student_id, student_id, today, student_id))
-                result = cursor.fetchone()
-                return result[0] if result and result[0] is not None else 0
-        except Exception as e:
-            print(f"❌ Ошибка при расчете баланса: {e}")
-            return 0
+                
+                # Явно выбираем нужные колонки. Теперь:
+                # contact[0] - это balance
+                # contact[1] - это lesson_price
+                # contact[2] - это lesson_price_updated_at
+                cursor.execute("""
+                    SELECT balance, lesson_price, lesson_price_updated_at 
+                    FROM contacts 
+                    WHERE id = ?
+                """, (student_id,))
+                
+                contact = cursor.fetchone()
+                if not contact: 
+                    return 0
+            
+                base_balance = contact[0]
+                current_price = contact[1]
+                beacon_date = contact[2] if contact[2] else '2024-01-01 00:00:00'
 
+                # 1. Считаем все уроки после "маяка"
+                cursor.execute("""
+                    SELECT COUNT(*) FROM lessons 
+                    WHERE student_id = ? 
+                    AND date(lesson_date) >= date(?)
+                """, (student_id, beacon_date))
+                lessons_count = cursor.fetchone()[0]
+
+                # 2. Считаем все оплаты после "маяка"
+                cursor.execute("""
+                    SELECT COALESCE(SUM(amount), 0) FROM payments 
+                    WHERE student_id = ? 
+                    AND date(payment_date) >= date(?)
+                """, (student_id, beacon_date))
+                payments_sum = cursor.fetchone()[0]
+
+                # Итоговый баланс
+                # 0 + 0 - (1 * 50) = -50
+                actual_balance = base_balance + payments_sum - (lessons_count * current_price)
+                return actual_balance
+
+        except Exception as e:
+            print(f"Ошибка в расчете баланса: {e}")
+            return 0
     def has_future_lessons(self, student_id):
         today = self._get_today()
-        query = "SELECT COUNT(*) FROM lessons WHERE student_id = ? AND lesson_date > ?"
+        # Смени > на >= чтобы бот видел сегодняшний урок как "активное занятие"
+        query = "SELECT COUNT(*) FROM lessons WHERE student_id = ? AND date(lesson_date) >= date(?)"
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -47,16 +71,10 @@ class FinanceManager:
         if balance < 0:
             return "🔴", f"Долг: {abs(balance)} PLN"
         
-        has_lessons = self.has_future_lessons(student_id)
+        has_future = self.has_future_lessons(student_id)
 
         if balance == 0:
-            if has_lessons:
-                return "🟡", "Пора оплатить (есть запись)"
-            else:
-                return "⚪️", "Нет активных занятий"
+            return ("🟡", "Пора оплатить (есть запись)") if has_future else ("⚪️", "Нет активных занятий")
 
         # Если balance > 0
-        if has_lessons:
-            return "🟢", f"Оплачено (баланс {balance} PLN)"
-        else:
-            return "🟢", f"Запас: {balance} PLN (нет записей)"
+        return ("🟢", f"Оплачено ({balance} PLN)") if has_future else ("✅", f"Баланс: {balance} PLN")

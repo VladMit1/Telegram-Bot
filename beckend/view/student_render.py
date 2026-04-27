@@ -4,7 +4,7 @@ def get_main_markup():
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("➕ Добавить ученика", callback_data="add_student"))
     return markup
-def render_student_card(bot, chat_id, student_data, finance, is_search=False, show_add_button=False):
+def render_student_card(bot, chat_id, student_data, finance,is_edit=False, message_id=None, is_search=False, show_add_button=False):
     student_id = student_data[0]
     name = student_data[1]
     phone = student_data[2]
@@ -38,7 +38,7 @@ def render_student_card(bot, chat_id, student_data, finance, is_search=False, sh
     markup.add(btn_chat, types.InlineKeyboardButton("📅 Расписание", callback_data=f"open_calendar_{student_id}"))
 
     markup.add(
-        types.InlineKeyboardButton("🎥 Урок", url=meet_url),
+        types.InlineKeyboardButton("🎥 Урок", callback_data=f"start_lesson_{student_id}"),
         types.InlineKeyboardButton("💳 Пополнить", callback_data=f"pay_{student_id}")
     )
 

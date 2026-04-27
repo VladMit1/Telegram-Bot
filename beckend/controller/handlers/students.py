@@ -20,7 +20,7 @@ def register_student_handlers(bot, db, state_data, ui_refs):
     @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_stu_"))
     def student_settings(call):
         student_id = call.data.split("_")[2]
-        student = db.get_by_id(student_id)
+        student = db.get_student_by_id(student_id)
         ui_refs['clear_screen'](call.message.chat.id)
         try: bot.delete_message(call.message.chat.id, call.message.message_id)
         except: pass
@@ -28,13 +28,23 @@ def register_student_handlers(bot, db, state_data, ui_refs):
         markup = types.InlineKeyboardMarkup(row_width=2)
         markup.add(
             types.InlineKeyboardButton("🏷️ Имя", callback_data=f"edit_name_{student_id}"),
-            types.InlineKeyboardButton("💰 Цена", callback_data=f"edit_prc_{student_id}"),
+            types.InlineKeyboardButton("💰 Цена", callback_data=f"edit_price_{student_id}"),
             types.InlineKeyboardButton("🗑️ Удалить", callback_data=f"del_{student_id}"),
             types.InlineKeyboardButton("🔙 Назад", callback_data="show_all")
         )
         bot.send_message(call.message.chat.id, f"⚙️ <b>Настройки:</b> {student[1]}", 
                          reply_markup=markup, parse_mode="HTML")
-
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_price_"))
+    def edit_price_init(call):
+        student_id = call.data.split("_")[2]
+        user_id = call.from_user.id
+        
+        state_data[user_id] = {
+            'step': 'waiting_new_price',
+            'edit_student_id': student_id
+        }
+        
+        bot.send_message(call.message.chat.id, "💰 <b>Введите новую цену за урок (PLN):</b>", parse_mode="HTML")
     @bot.callback_query_handler(func=lambda call: call.data.startswith('del_'))
     def delete_student(call):
         db.delete_contact(call.data.split('_')[1])
@@ -91,3 +101,51 @@ def handle_student_text(bot, db, message, user_data, ui_refs):
 
     user_data[user_id]['step'] = None
     ui_refs['handle_start'](message)
+
+    # Инициализация смены цены
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_price_"))
+    def edit_price_init(call):
+        student_id = call.data.split("_")[2]
+        user_id = call.from_user.id
+    
+        user_data[user_id] = {
+        'step': 'waiting_new_price',
+        'edit_student_id': student_id
+        }
+    
+        bot.send_message(call.message.chat.id, "💰 <b>Введите новую цену за урок (PLN):</b>", parse_mode="HTML")
+
+# Обработка ввода новой цены (в handle_student_text или отдельном хендлере)
+
+def handle_price_update(bot, db, finance, message, user_id, student_id, user_data, ui_refs):
+    chat_id = message.chat.id
+    try:
+        # Пытаемся получить число
+        new_price = int(message.text.strip())
+        
+        # 1. Считаем текущий баланс ДО изменения цены (Маяк)
+        current_balance = finance.get_actual_balance(student_id)
+        
+        # 2. Сохраняем в базу (новую цену, дату и замороженный баланс)
+        success = db.set_new_lesson_price(student_id, new_price, current_balance)
+        
+        if success:
+            # Удаляем сообщение с вводом и инструкцию
+            state = user_data.get(user_id, {})
+            if state.get('last_instruction_id'):
+                try: bot.delete_message(chat_id, state['last_instruction_id'])
+                except: pass
+            try: bot.delete_message(chat_id, message.message_id)
+            except: pass
+
+            bot.answer_callback_query(user_id, "✅ Цена и баланс обновлены", show_alert=False)
+            
+            # Сбрасываем стейт и возвращаемся в главное меню
+            user_data[user_id]['step'] = None
+            ui_refs['handle_start'](message)
+        else:
+            bot.send_message(chat_id, "❌ Ошибка БД.")
+            
+    except ValueError:
+        msg = bot.send_message(chat_id, "⚠ <b>Введите целое число!</b>", parse_mode="HTML")
+        # Можно добавить удаление этого предупреждения через пару секунд

@@ -3,6 +3,19 @@ import os
 import requests
 from datetime import datetime
 
+from datetime import datetime, timedelta
+
+def round_time_to_hour(dt=None):
+    if dt is None:
+        dt = datetime.now()
+    step = 60 
+    accumulated_minutes = dt.minute + dt.second / 60
+    if accumulated_minutes >= (step / 2):
+        rounded_dt = dt.replace(minute=0, second=0, microsecond=0) + timedelta(minutes=step)
+    else:
+        rounded_dt = dt.replace(minute=0, second=0, microsecond=0)
+    return rounded_dt.strftime("%Y-%m-%d"), rounded_dt.strftime("%H:%M")
+
 class DBManager:
     def __init__(self):
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,6 +42,7 @@ class DBManager:
                         last_page INTEGER DEFAULT 0,
                         balance INTEGER DEFAULT 0,
                         lesson_price INTEGER DEFAULT 50,
+                        lesson_price_updated_at TIMESTAMP,
                         username TEXT
                     )
                 ''')
@@ -42,6 +56,7 @@ class DBManager:
                 required_migrations = [
                     ('username', 'TEXT'),
                     ('lesson_price', 'INTEGER DEFAULT 50'),
+                    ('lesson_price_updated_at', 'TIMESTAMP'),
                     ('last_book', "TEXT DEFAULT 'Не выбрана'"),
                     ('last_page', "INTEGER DEFAULT 0"),
                     ('balance', "INTEGER DEFAULT 0")
@@ -304,7 +319,7 @@ class DBManager:
             print(f"Ошибка удаления платежа: {e}")
             return False
         
-    def get_by_id(self, student_id):
+    def get_student_by_id(self, student_id):
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -365,4 +380,68 @@ class DBManager:
                 return [row[0] for row in cursor.fetchall()]
         except:
             return []
+    def get_all_busy_days(self, year, month):
+    # Используем strftime для фильтрации по году и месяцу
+        query = """
+            SELECT DISTINCT strftime('%d', lesson_date) 
+            FROM lessons 
+            WHERE strftime('%Y', lesson_date) = ? 
+            AND strftime('%m', lesson_date) = ?
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                # Важно: sqlite ожидает строки в параметрах для strftime
+                cursor.execute(query, (str(year), f"{month:02d}"))
+                results = cursor.fetchall()
+                # Извлекаем первый элемент каждого кортежа и превращаем в число
+                return [int(row[0]) for row in results]
+        except Exception as e:
+            print(f"Ошибка в get_all_busy_days: {e}")
+            return []
+    def set_new_lesson_price(self, student_id, new_price, current_actual_balance):
+    # Используем текущее время для отметки маяка
+        today = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE contacts 
+                    SET balance = ?, 
+                        lesson_price = ?, 
+                        lesson_price_updated_at = ? 
+                    WHERE id = ?
+                """, (current_actual_balance, new_price, today, student_id))
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"❌ Ошибка в set_new_lesson_price: {e}")
+            return False
+    def auto_lesson_check_in(self, student_id):
+        date_str, time_str = round_time_to_hour()
+        
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                # Ищем, нет ли записи на этот час у этого ученика
+                cursor.execute("""
+                    SELECT id FROM lessons 
+                    WHERE student_id = ? AND lesson_date = ? AND lesson_time = ?
+                """, (student_id, date_str, time_str))
+                
+                existing_lesson = cursor.fetchone()
+                
+                if not existing_lesson:
+                    # Если пусто — создаем новую запись
+                    cursor.execute("""
+                        INSERT INTO lessons (student_id, lesson_date, lesson_time, topic)
+                        VALUES (?, ?, ?, ?)
+                    """, (student_id, date_str, time_str, "Урок (кнопка)"))
+                    conn.commit()
+                    return True, time_str # Новый урок создан
+                
+                return False, time_str # Урок уже был в расписании
+        except Exception as e:
+            print(f"Ошибка авто-урока: {e}")
+            return False, time_str
 db = DBManager()

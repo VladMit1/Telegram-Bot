@@ -2,7 +2,7 @@ import time
 from database.db_manager import db
 from view.student_render import render_student_card
 from controller.handlers.common import register_common_handlers
-from controller.handlers.students import register_student_handlers, handle_student_text
+from controller.handlers.students import register_student_handlers, handle_student_text,handle_price_update
 from controller.handlers.payments import register_payment_handlers, handle_payment_text
 from controller.handlers.lessons import register_lesson_handlers
 
@@ -32,7 +32,7 @@ def register_handlers(bot, finance):
     ui_refs['handle_start'] = register_common_handlers(bot, db, finance, user_data, ui_refs)
     register_student_handlers(bot, db, user_data, ui_refs)
     register_payment_handlers(bot, db, user_data, ui_refs)
-    register_lesson_handlers(bot, db, ui_refs)
+    register_lesson_handlers(bot, db, ui_refs, finance)
 
     # Единый обработчик текста
     @bot.message_handler(func=lambda m: True, content_types=['text'])
@@ -51,8 +51,12 @@ def register_handlers(bot, finance):
         # 2. Если ждем сумму денег
         elif step == 'waiting_pay_amount':
             handle_payment_text(bot, db, message, user_data, ui_refs)
+        # 3. НОВОЕ: Если ждем новую цену (Маяк)
+        elif step == 'waiting_new_price':
+            # Вызываем функцию из модуля students, передавая объект finance
+            handle_price_update(bot, db, finance, message, user_id, state.get('edit_student_id'), user_data, ui_refs)
         
-        # 3. Иначе — это ПОИСК
+        # 4. Иначе — это ПОИСК
         else:
             results = db.search_contacts(message.text.strip())
             if results:
