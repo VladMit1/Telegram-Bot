@@ -1,6 +1,6 @@
 from telebot import types
-from view.student_render import render_student_card, get_main_markup
-from view.calendar_view import create_calendar  # НЕ ЗАБУДЬ ЭТОТ ИМПОРТ
+from view.student_render import render_student_list, get_main_markup
+from view.calendar_view import create_calendar
 
 def register_common_handlers(bot, db, finance, state_data, ui_refs):
     
@@ -10,32 +10,36 @@ def register_common_handlers(bot, db, finance, state_data, ui_refs):
         user_id = message.from_user.id
         
         state_data[user_id] = {'step': None}
+        
+        # Удаляем команду /start из чата для чистоты
         try: bot.delete_message(chat_id, message.message_id)
         except: pass
         
+        # Полная очистка экрана
         ui_refs['clear_screen'](chat_id)
         
-        contacts = db.get_all()
+        contacts = db.get_all() # Получаем всех учеников
+        
         if not contacts:
-            msg = bot.send_message(chat_id, "👋 <b>Список пуст.</b>", 
+            msg = bot.send_message(chat_id, "👋 <b>База пуста. Добавьте первого ученика:</b>", 
                                    parse_mode="HTML", reply_markup=get_main_markup())
             ui_refs['welcome_msg_id'] = msg.message_id
         else:
-            msg = bot.send_message(chat_id, "🗂 <b>Ваши ученики:</b>", parse_mode="HTML")
-            ui_refs['welcome_msg_id'] = msg.message_id
-            for i, c in enumerate(contacts):
-                is_last = (i == len(contacts) - 1)
-                m_id = render_student_card(bot, chat_id, c, finance, show_add_button=is_last)
-                ui_refs['search_results_ids'].append(m_id)
+            # ВМЕСТО ЦИКЛА: Вызываем один раз для всего списка
+            # render_student_list создаст одно сообщение с кнопками-именами
+            m_id = render_student_list(bot, chat_id, contacts, finance)
+            ui_refs['search_results_ids'].append(m_id)
 
-    @bot.callback_query_handler(func=lambda call: call.data in ["show_all", "cancel_add", "cancel_pay"])
+    @bot.callback_query_handler(func=lambda call: call.data in ["show_all", "main_menu", "cancel_add", "cancel_pay"])
     def handle_back(call):
         user_id = call.from_user.id
         if user_id in state_data:
             state_data[user_id]['step'] = None
+        
+        # Вместо handle_start(call.message), который может глючить из-за объекта call.message,
+        # лучше явно вызвать логику очистки и показа списка:
         handle_start(call.message)
 
-    # ОБРАБОТЧИК НАВИГАЦИИ (Теперь ВНУТРИ функции регистрации)
     @bot.callback_query_handler(func=lambda call: call.data.startswith("cal_nav_"))
     def handle_calendar_navigation(call):
         params = call.data.split("_")
@@ -69,4 +73,4 @@ def register_common_handlers(bot, db, finance, state_data, ui_refs):
         except Exception:
             pass
 
-    return handle_start  # ТЕПЕРЬ RETURN В САМОМ КОНЦЕ
+    return handle_start

@@ -42,7 +42,7 @@ class DBManager:
                         last_page INTEGER DEFAULT 0,
                         balance INTEGER DEFAULT 0,
                         lesson_price INTEGER DEFAULT 50,
-                        lesson_price_updated_at TIMESTAMP,
+                        lesson_price_updated_at TIMESTAMP DEFAULT '2024-01-01 00:00:00',
                         username TEXT
                     )
                 ''')

@@ -1,7 +1,8 @@
 import time
 from telebot import types
+from view.student_render import render_student_card
 
-def register_student_handlers(bot, db, state_data, ui_refs):
+def register_student_handlers(bot, db, state_data, ui_refs, finance):
 
     @bot.callback_query_handler(func=lambda call: call.data == "add_student")
     def add_student_init(call):
@@ -16,7 +17,49 @@ def register_student_handlers(bot, db, state_data, ui_refs):
         sent_msg = bot.send_message(call.message.chat.id, "📝 <b>Введите данные:</b>\n<code>@username Имя</code>", 
                                     parse_mode="HTML", reply_markup=markup)
         state_data[user_id]['last_instruction_id'] = sent_msg.message_id
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("view_stu_"))
+    def open_card(call):
+        chat_id = call.message.chat.id
+        user_id = call.from_user.id
+        # Извлекаем ID ученика из call.data (например, "view_stu_4" -> 4)
+        student_id = int(call.data.split("_")[2])
 
+        # 1. Очищаем экран (удаляем сообщение со списком имен)
+        ui_refs['clear_screen'](chat_id)
+
+        # 2. Получаем полные данные ученика из БД
+        # Убедись, что метод get_student_by_id возвращает кортеж со всеми полями (id, name, phone...)
+        student_data = db.get_student_by_id(student_id)
+
+        if student_data:
+            # 3. Рендерим карточку ученика
+            # is_search=True добавит кнопку "Назад", которая вернет пользователя к списку
+        
+            m_id = render_student_card(
+                bot, 
+                chat_id, 
+                student_data, 
+                finance, 
+                is_search=True 
+            )
+        
+            # 4. Сохраняем ID сообщения в список для будущей очистки
+            ui_refs['search_results_ids'].append(m_id)
+        else:
+            bot.answer_callback_query(call.id, "❌ Ученик не найден в базе", show_alert=True)
+
+    @bot.callback_query_handler(func=lambda call: call.data == "show_all")
+    def go_back_to_list(call):
+        chat_id = call.message.chat.id
+        # Очищаем карточку
+        ui_refs['clear_screen'](chat_id)
+    
+        # Снова вызываем поиск или показываем всех (зависит от твоей логики)
+        # Если хочешь просто показать всех:
+        results = db.get_all_contacts() 
+        from view.student_render import render_student_list
+        m_id = render_student_list(bot, chat_id, results, finance)
+        ui_refs['search_results_ids'].append(m_id)
     @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_stu_"))
     def student_settings(call):
         student_id = call.data.split("_")[2]

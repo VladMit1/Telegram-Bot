@@ -13,10 +13,10 @@ def render_student_card(bot, chat_id, student_data, finance,is_edit=False, messa
     # По твоей таблице: balance - 8, username - 10
     balance = student_data[8]
     username = student_data[10]
-    
+    actual_balance = finance.get_actual_balance(student_id)
     # Считаем статус через твой класс finance
-    status_emoji, status_text = finance.get_financial_status(student_id, balance)
-    
+    status_emoji, status_text = finance.get_financial_status(student_id, actual_balance)
+
     # 1. ФИКСАТОР ШИРИНЫ (растягивает карточку)
     width_fixer = "ㅤ" * 22  # Невидимые символы
     divider = "──────────────────────────"
@@ -67,3 +67,39 @@ def render_student_card(bot, chat_id, student_data, finance,is_edit=False, messa
     except Exception as e:
         print(f"Ошибка рендера: {e}")
         return bot.send_message(chat_id, caption, parse_mode="HTML", reply_markup=markup).message_id
+def render_student_list(bot, chat_id, students, finance):
+    """
+    Список учеников в одну колонку. Имена слева + текстовый разделитель.
+    """
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    
+    if not students:
+        markup.add(types.InlineKeyboardButton("➕ Добавить первого", callback_data="add_student"))
+        return bot.send_message(chat_id, "🔎 <b>Учеников пока нет</b>", parse_mode="HTML", reply_markup=markup).message_id
+
+    for s in students:
+        s_id, s_name = s[0], s[1]
+        
+        # Считаем баланс для эмодзи
+        balance = finance.get_actual_balance(s_id)
+        status_emoji, _ = finance.get_financial_status(s_id, balance)
+        
+        # Хитрость для выравнивания влево: добавляем невидимый символ и пробелы в конце
+        # Телеграм центрирует текст, поэтому "забиваем" правую часть пустотой
+        left_aligned_text = f"{status_emoji} {s_name}" + " " * 30 
+        
+        markup.add(types.InlineKeyboardButton(
+            text=left_aligned_text, 
+            callback_data=f"view_stu_{s_id}"
+        ))
+    
+    # Кнопка добавления внизу
+    markup.add(types.InlineKeyboardButton("➕ Добавить нового ученика", callback_data="add_student"))
+    
+    # Текстовый разделитель внутри самого сообщения (вместо кнопки-палки)
+    divider_text = "──────────────────────────"
+    msg_text = (f"📋 <b>База учеников</b>\n"
+                f"{divider_text}\n"
+                f"<i>Выберите имя для управления:</i>")
+    
+    return bot.send_message(chat_id, msg_text, parse_mode="HTML", reply_markup=markup).message_id

@@ -36,6 +36,7 @@ class FinanceManager:
                     SELECT COUNT(*) FROM lessons 
                     WHERE student_id = ? 
                     AND date(lesson_date) >= date(?)
+                    AND date(lesson_date) <= date('now')
                 """, (student_id, beacon_date))
                 lessons_count = cursor.fetchone()[0]
 

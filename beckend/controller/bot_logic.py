@@ -30,7 +30,7 @@ def register_handlers(bot, finance):
 
     # Регистрация Callback-обработчиков
     ui_refs['handle_start'] = register_common_handlers(bot, db, finance, user_data, ui_refs)
-    register_student_handlers(bot, db, user_data, ui_refs)
+    register_student_handlers(bot, db, user_data, ui_refs, finance)
     register_payment_handlers(bot, db, user_data, ui_refs)
     register_lesson_handlers(bot, db, ui_refs, finance)
 
@@ -51,16 +51,32 @@ def register_handlers(bot, finance):
         # 2. Если ждем сумму денег
         elif step == 'waiting_pay_amount':
             handle_payment_text(bot, db, message, user_data, ui_refs)
-        # 3. НОВОЕ: Если ждем новую цену (Маяк)
+            
+        # 3. Если ждем новую цену (Маяк)
         elif step == 'waiting_new_price':
-            # Вызываем функцию из модуля students, передавая объект finance
             handle_price_update(bot, db, finance, message, user_id, state.get('edit_student_id'), user_data, ui_refs)
         
-        # 4. Иначе — это ПОИСК
+        # 4. ПОИСК (теперь возвращает список имен)
         else:
-            results = db.search_contacts(message.text.strip())
+            text_query = message.text.strip()
+            results = db.search_contacts(text_query)
+            
             if results:
+                # Очищаем экран от предыдущих списков/карточек
                 clear_screen(chat_id)
-                for r in results:
-                    m_id = render_student_card(bot, chat_id, r, finance, is_search=True)
-                    ui_refs['search_results_ids'].append(m_id)
+                
+                # Вместо цикла for r in results:
+                # Импортируем и вызываем рендер списка
+                from view.student_render import render_student_list
+                
+                m_id = render_student_list(bot, chat_id, results, finance)
+                
+                # Добавляем ID сообщения в список для будущей очистки
+                ui_refs['search_results_ids'].append(m_id)
+                
+                # Удаляем текст самого пользователя (поиск "Влад"), чтобы было красиво
+                try: bot.delete_message(chat_id, message.message_id)
+                except: pass
+            else:
+                # Если ничего не нашли, можно мигнуть алертом или просто проигнорировать
+                bot.send_message(chat_id, "❌ Ученик не найден")
