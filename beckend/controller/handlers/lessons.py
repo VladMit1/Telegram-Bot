@@ -69,31 +69,60 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
         ui_refs['handle_start'](call.message)
     @bot.callback_query_handler(func=lambda call: call.data.startswith("start_lesson_"))
     def start_lesson_callback(call):
+        chat_id = call.message.chat.id
         student_id = call.data.split("_")[2]
-    
-        # 1. Записываем/проверяем урок
-        is_added, l_time = db.auto_lesson_check_in(student_id)
-    
-        # 2. Получаем свежие данные
-        student_data = db.get_student_by_id(student_id) 
-        
-        # 3. Импортируем рендер (если он не импортирован выше)
-        from view.student_render import render_student_card 
-    
-        # 4. Обновляем саму карточку (теперь finance доступен из аргументов выше)
-        render_student_card(
-            bot, 
-            call.message.chat.id, 
-            student_data, 
-            finance, 
-            is_edit=True, 
-            message_id=call.message.message_id
-        )
 
-        # 5. Кнопка-ссылка
+        # 1. Пытаемся зафиксировать урок в базе
+        success, result = db.auto_lesson_check_in(student_id)
+
+        if not success:
+            # Если занято — просто показываем алерт (result здесь — имя занявшего)
+            bot.answer_callback_query(call.id, f"⚠️ Сейчас идет урок у: {result}", show_alert=True)
+            return 
+
+        # --- ЕСЛИ УСПЕХ ---
+    
+        # 2. Удаляем старую карточку, чтобы не мусорить
+        try: bot.delete_message(chat_id, call.message.message_id)
+        except: pass
+
+        # 3. Рисуем НОВУЮ карточку ученика (баланс обновился)
+        student_data = db.get_student_by_id(student_id)
+        from view.student_render import render_student_card
+        render_student_card(bot, chat_id, student_data, finance, is_edit=True,is_search=True)
+
+        # 4. СОЗДАЕМ КНОПКИ ДЛЯ ССЫЛКИ
         meet_url = f"https://meet.google.com/lookup/lesson-{student_id}"
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("🌐 ВОЙТИ В GOOGLE MEET", url=meet_url))
+        markup = types.InlineKeyboardMarkup(row_width=1) # Кнопки будут друг под другом
         
-        bot.send_message(call.message.chat.id, f"✅ Урок на {l_time} зафиксирован.\nНажмите кнопку для входа:", reply_markup=markup)
+        btn_meet = types.InlineKeyboardButton("🌐 ВОЙТИ В GOOGLE MEET", url=meet_url)
+        btn_close = types.InlineKeyboardButton("❌ Закрыть ссылку", callback_data="delete_this_msg")
+
+        
+        markup.add(btn_meet, btn_close )
+    
+        # 5. Отправляем сообщение с кнопками
+        bot.send_message(
+            chat_id, 
+            f"✅ Урок на <b>{result}</b> зафиксирован.\nНажмите кнопку для входа:", 
+            parse_mode="HTML", 
+            reply_markup=markup
+        )
         bot.answer_callback_query(call.id)
+    @bot.callback_query_handler(func=lambda call: call.data == "delete_this_msg")
+    def handle_delete_msg(call):
+        try:
+            # Просто удаляем само сообщение, где была кнопка "Закрыть"
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+            
+            # Обязательно отвечаем телеграму, чтобы кнопка не "зависала" в режиме загрузки
+            bot.answer_callback_query(call.id)
+        except Exception as e:
+            # Если вдруг сообщение уже удалено (например, вручную), просто закрываем запрос
+            bot.answer_callback_query(call.id)
+            
+    @bot.callback_query_handler(func=lambda call: call.data == "ignore")
+    def handle_ignore(call):
+        """Обработка нажатия на занятое время (крестик)"""
+        bot.answer_callback_query(call.id, "⚠️ Это время уже занято другим учеником", show_alert=False)
+        

@@ -418,30 +418,45 @@ class DBManager:
             print(f"❌ Ошибка в set_new_lesson_price: {e}")
             return False
     def auto_lesson_check_in(self, student_id):
-        date_str, time_str = round_time_to_hour()
-        
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_time = datetime.now().strftime("%H:00")
+
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                # Ищем, нет ли записи на этот час у этого ученика
+                
+                # 1. Проверяем занятость времени
+                check_query = "SELECT student_id FROM lessons WHERE lesson_date = ? AND lesson_time = ?"
+                cursor.execute(check_query, (current_date, current_time))
+                row = cursor.fetchone()
+
+                if row:
+                    found_id = row[0]
+                    # Если это тот же самый ученик — пропускаем к уроку
+                    if str(found_id) == str(student_id):
+                        return True, current_time
+                    
+                    # Если ID другой — вытаскиваем имя из таблицы CONTACTS
+                    try:
+                        cursor.execute("SELECT name FROM contacts WHERE id = ?", (found_id,))
+                        res_name = cursor.fetchone()
+                        busy_name = res_name[0] if res_name else f"ID:{found_id}"
+                    except:
+                        busy_name = "другим учеником"
+                    
+                    return False, busy_name
+
+                # 2. Если время свободно — создаем запись
+                # Добавил duration=60, так как в твоей PRAGMA это поле есть
                 cursor.execute("""
-                    SELECT id FROM lessons 
-                    WHERE student_id = ? AND lesson_date = ? AND lesson_time = ?
-                """, (student_id, date_str, time_str))
+                    INSERT INTO lessons (student_id, lesson_date, lesson_time, topic, duration)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (student_id, current_date, current_time, "Авто-урок", 60))
+                conn.commit()
                 
-                existing_lesson = cursor.fetchone()
-                
-                if not existing_lesson:
-                    # Если пусто — создаем новую запись
-                    cursor.execute("""
-                        INSERT INTO lessons (student_id, lesson_date, lesson_time, topic)
-                        VALUES (?, ?, ?, ?)
-                    """, (student_id, date_str, time_str, "Урок (кнопка)"))
-                    conn.commit()
-                    return True, time_str # Новый урок создан
-                
-                return False, time_str # Урок уже был в расписании
+                return True, current_time
+
         except Exception as e:
-            print(f"Ошибка авто-урока: {e}")
-            return False, time_str
+            print(f"❌ Ошибка БД: {e}")
+            return False, f"Ошибка базы: {str(e)}"
 db = DBManager()
