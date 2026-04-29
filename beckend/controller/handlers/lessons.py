@@ -72,39 +72,45 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
         chat_id = call.message.chat.id
         student_id = call.data.split("_")[2]
 
-        # 1. Пытаемся зафиксировать урок в базе
+        # 1. Фиксируем урок
         success, result = db.auto_lesson_check_in(student_id)
 
         if not success:
-            # Если занято — просто показываем алерт (result здесь — имя занявшего)
             bot.answer_callback_query(call.id, f"⚠️ Сейчас идет урок у: {result}", show_alert=True)
             return 
 
-        # --- ЕСЛИ УСПЕХ ---
+        # 2. ПОЛНАЯ ОЧИСТКА ЭКРАНА
+        ui_refs['clear_screen'](chat_id)
     
-        # 2. Удаляем старую карточку, чтобы не мусорить
-        try: bot.delete_message(chat_id, call.message.message_id)
-        except: pass
-
-        # 3. Рисуем НОВУЮ карточку ученика (баланс обновился)
+        # 3. Достаем имя ученика для заголовка
         student_data = db.get_student_by_id(student_id)
-        from view.student_render import render_student_card
-        render_student_card(bot, chat_id, student_data, finance, is_edit=True,is_search=True)
+        student_name = student_data[1]
 
-        # 4. СОЗДАЕМ КНОПКИ ДЛЯ ССЫЛКИ
+        # 4. СОЗДАЕМ ШИРОКИЙ ЭКРАН УРОКА
+        w = "⠀" # Невидимый расширитель
         meet_url = f"https://meet.google.com/lookup/lesson-{student_id}"
-        markup = types.InlineKeyboardMarkup(row_width=1) # Кнопки будут друг под другом
-        
-        btn_meet = types.InlineKeyboardButton("🌐 ВОЙТИ В GOOGLE MEET", url=meet_url)
-        btn_close = types.InlineKeyboardButton("❌ Закрыть ссылку", callback_data="delete_this_msg")
-
-        
-        markup.add(btn_meet, btn_close )
     
-        # 5. Отправляем сообщение с кнопками
+        markup = types.InlineKeyboardMarkup(row_width=1)
+    
+        # Делаем кнопки широкими для телефона
+        btn_meet = types.InlineKeyboardButton(f"{w*5}🌐 ВОЙТИ В GOOGLE MEET{w*5}", url=meet_url)
+        btn_back = types.InlineKeyboardButton(f"{w*7}🔙 НАЗАД К ПРОФИЛЮ{w*7}", callback_data=f"view_stu_{student_id}")
+
+        markup.add(btn_meet, btn_back)
+
+        # 5. Красивый текст-карточка
+        text = (
+            f"✅ <b>Урок зафиксирован!</b>\n"
+            f"──────────────────────────\n"
+            f"👤 Ученик: <b>{student_name}</b>\n"
+            f"⏰ Время: <b>{result}</b>\n"
+            f"──────────────────────────\n"
+            f"<i>Ссылка готова. После урока нажмите\n«Назад», чтобы проверить баланс.</i>"
+        )
+
         bot.send_message(
             chat_id, 
-            f"✅ Урок на <b>{result}</b> зафиксирован.\nНажмите кнопку для входа:", 
+            text, 
             parse_mode="HTML", 
             reply_markup=markup
         )

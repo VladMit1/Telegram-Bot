@@ -2,14 +2,14 @@ from telebot import types
 from view.student_render import render_student_list, get_main_markup
 from view.calendar_view import create_calendar
 
-def register_common_handlers(bot, db, finance, state_data, ui_refs):
+def register_common_handlers(bot, db, finance, user_data, ui_refs):
     
     @bot.message_handler(commands=['start'])
     def handle_start(message):
         chat_id = message.chat.id
         user_id = message.from_user.id
         
-        state_data[user_id] = {'step': None}
+        user_data[user_id] = {'step': None}
         
         # Удаляем команду /start из чата для чистоты
         try: bot.delete_message(chat_id, message.message_id)
@@ -33,8 +33,8 @@ def register_common_handlers(bot, db, finance, state_data, ui_refs):
     @bot.callback_query_handler(func=lambda call: call.data in ["show_all", "main_menu", "cancel_add", "cancel_pay"])
     def handle_back(call):
         user_id = call.from_user.id
-        if user_id in state_data:
-            state_data[user_id]['step'] = None
+        if user_id in user_data:
+            user_data[user_id]['step'] = None
         
         # Вместо handle_start(call.message), который может глючить из-за объекта call.message,
         # лучше явно вызвать логику очистки и показа списка:

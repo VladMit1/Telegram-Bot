@@ -2,7 +2,7 @@ import time
 from telebot import types
 from view.calendar_view import create_calendar
 
-def register_payment_handlers(bot, db, state_data, ui_refs):
+def register_payment_handlers(bot, db, user_data, ui_refs):
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("pay_") and not call.data.startswith("pay_date_"))
     def open_pay_calendar(call):
@@ -22,7 +22,7 @@ def register_payment_handlers(bot, db, state_data, ui_refs):
         params = call.data.split("_")
         s_id, sel_date = params[2], params[3]
         
-        state_data[user_id].update({
+        user_data[user_id].update({
             'step': 'waiting_pay_amount',
             'student_id': s_id,
             'pay_date': sel_date
@@ -34,7 +34,7 @@ def register_payment_handlers(bot, db, state_data, ui_refs):
         markup = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("❌ Отмена", callback_data="cancel_pay"))
         sent_msg = bot.send_message(call.message.chat.id, f"💰 <b>Дата: {sel_date}</b>\nВведите сумму:", 
                                     reply_markup=markup, parse_mode="HTML")
-        state_data[user_id]['pay_instruction_id'] = sent_msg.message_id
+        user_data[user_id]['pay_instruction_id'] = sent_msg.message_id
 
 def handle_payment_text(bot, db, message, user_data, ui_refs):
     user_id = message.from_user.id

@@ -161,10 +161,50 @@ class DBManager:
                 res = cursor.fetchone()
                 return res[0] if res else 0
         except: return 0
+    def try_delete_student(self, student_id, finance):
+        try:
+            # 1. Проверяем баланс перед удалением
+            balance = finance.get_actual_balance(student_id)
+        
+            if balance < 0:
+                # Если есть долг, возвращаем False и текст ошибки
+                return False, f"Нельзя удалить! У ученика долг: {balance} PLN. Сначала закройте долг."
 
-    def delete_contact(self, contact_id):
-        query = "DELETE FROM contacts WHERE id = ?"
-        self.execute_query(query, (contact_id,))
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                # 2. Собираем статистику для таблицы deleted_contacts
+                cursor.execute("SELECT name, phone, date_added FROM contacts WHERE id = ?", (student_id,))
+                student = cursor.fetchone()
+
+                if student:
+                    name, phone, date_added = student
+
+                    # Считаем итого по деньгам и урокам
+                    cursor.execute("SELECT SUM(amount) FROM payments WHERE student_id = ?", (student_id,))
+                    total_paid = cursor.fetchone()[0] or 0
+
+                    cursor.execute("SELECT COUNT(*) FROM lessons WHERE student_id = ?", (student_id,))
+                    total_lessons = cursor.fetchone()[0] or 0
+
+                    # 3. Сохраняем в архив (таблицу deleted_contacts создай заранее)
+                    cursor.execute("""
+                        INSERT INTO deleted_contacts 
+                        (name, phone, total_paid, total_lessons, period_start, period_end)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (name, phone, total_paid, total_lessons, date_added, datetime.now().strftime("%Y-%m-%d")))
+
+                # 4. Полная зачистка оперативных данных
+                cursor.execute("DELETE FROM payments WHERE student_id = ?", (student_id,))
+                cursor.execute("DELETE FROM lessons WHERE student_id = ?", (student_id,))
+                cursor.execute("DELETE FROM contacts WHERE id = ?", (student_id,))
+
+                conn.commit()
+                return True, "Ученик успешно удален и заархивирован."
+
+        except Exception as e:
+            print(f"Ошибка удаления: {e}")
+            return False, f"Ошибка базы данных: {e}"
 
     # Метод для React API
     def get_contacts_for_api(self, bot_token):
