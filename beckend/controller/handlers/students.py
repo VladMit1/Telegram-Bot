@@ -50,21 +50,23 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
     def handle_id_click(message):
         chat_id = message.chat.id
         student_id = int(message.text.replace("/id", ""))
-    
-        # 1. Удаляем команду /id123 из чата, чтобы не мусорить
+
+        # 1. Удаляем команду /id123 (свежее сообщение)
         try: bot.delete_message(chat_id, message.message_id)
         except: pass
 
-        # 2. Очищаем экран от списка (если у тебя так настроено)
+        # 2. Пытаемся удалить сообщение ПЕРЕД командой /id 
+        # (обычно это и есть наш список учеников)
+        try: bot.delete_message(chat_id, message.message_id - 1)
+        except: pass
+
+        # 3. Очищаем массив (на случай если там что-то было)
         ui_refs['clear_screen'](chat_id)
 
-        # 3. Достаем данные и показываем карточку
         student_data = db.get_student_by_id(student_id)
         if student_data:
             m_id = render_student_card(bot, chat_id, student_data, finance, is_search=True)
             ui_refs['search_results_ids'].append(m_id)
-        else:
-            bot.send_message(chat_id, "❌ Ошибка: ученик не найден.")
 
     @bot.callback_query_handler(func=lambda call: call.data == "show_all")
     def go_back_to_list(call):
