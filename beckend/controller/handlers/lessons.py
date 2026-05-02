@@ -10,63 +10,94 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
         except: pass
         markup = create_calendar(student_id)
         bot.send_message(call.message.chat.id, "📅 <b>Расписание:</b>", 
-                         reply_markup=markup, parse_mode="HTML")
+                        reply_markup=markup, parse_mode="HTML")
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("cal_day_"))
     def select_lesson_day(call):
         d = call.data.split("_")
-        # Собираем данные: ID ученика и выбранную дату
-        s_id, sel_date = d[2], f"{d[3]}-{d[4].zfill(2)}-{d[5].zfill(2)}"
         
-        # Получаем словарь вида {'09:00': 'Имя Ученика', '11:00': 'Другой Ученик'}
-        booked = db.get_booked_times_with_names(sel_date)
-        
-        # Формируем список занятого времени для текста
-        booked_text = ""
-        if booked:
-            booked_text = "\n\n<b>Занято:</b>\n" + "\n".join([f"• {t} — {name}" for t, name in booked.items()])
-        
-        markup = types.InlineKeyboardMarkup(row_width=4)
-        # Сетка доступных часов (можешь менять под себя)
-        slots = ["00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"]
-        
-        btns = []
-        for t in slots:
-            if t in booked:
-                # Если занято — кнопка-заглушка с крестиком
-                btns.append(types.InlineKeyboardButton(f"❌ {t}", callback_data="ignore"))
-            else:
-                # Если свободно — рабочая кнопка
-                btns.append(types.InlineKeyboardButton(t, callback_data=f"stme_{s_id}_{sel_date}_{t}"))
-        
-        markup.add(*btns)
-        # Кнопка возврата в календарь
-        markup.add(types.InlineKeyboardButton("🔙 Назад к календарю", callback_data=f"open_calendar_{s_id}"))
-        
-        # Красиво оформляем дату для вывода (из ГГГГ-ММ-ДД в ДД.ММ)
-        display_date = f"{d[5]}.{d[4]}.{d[3]}"
-        
-        header = f"📅 <b>Дата: {display_date}</b>\nВыберите свободное время:{booked_text}"
-        
-        bot.edit_message_text(header, call.message.chat.id, call.message.message_id, 
-                              reply_markup=markup, parse_mode="HTML")
+        # ПРОВЕРКА: Если в списке меньше 6 элементов, значит это не клик по дате
+        if len(d) < 6:
+            print(f"⚠️ Неверный формат колбэка: {call.data}")
+            return
 
+        try:
+            # Извлекаем данные
+            s_id = d[2]
+            year = d[3]
+            month = d[4].zfill(2)
+            day = d[5].zfill(2)
+            
+            sel_date = f"{year}-{month}-{day}"
+            display_date = f"{day}.{month}.{year}"
+
+            # 1. Получаем детали из базы
+            booked = db.get_booked_details(sel_date)
+            
+            # 2. Формируем текст занятых слотов
+            booked_text = ""
+            if booked:
+                booked_text = "\n\n<b>Занято:</b>\n" + "\n".join(
+                    [f"• {t} — {val['name']}" for t, val in booked.items()]
+                )
+            
+            # 3. Сетка кнопок
+            markup = types.InlineKeyboardMarkup(row_width=4)
+            slots = [f"{h:02d}:00" for h in range(24)] # Генерация 00:00 - 23:00
+            
+            btns = []
+            for t in slots:
+                if t in booked:
+                    data = booked[t]
+                    
+                    # Если в базе старый формат (просто строка)
+                    if isinstance(data, str):
+                        btns.append(types.InlineKeyboardButton(f"🔒 {t}", callback_data=f"inf_{data}"))
+                        continue
+
+                    # Проверка: мой урок или чужой
+                    if str(data.get('id')) == str(s_id):
+                        # Отмена своего урока
+                        btns.append(types.InlineKeyboardButton(f"❌ {t}", callback_data=f"del_les_{sel_date}_{t}_{s_id}"))
+                    else:
+                        # Замок на чужой
+                        owner = data.get('name', 'Ученик')
+                        btns.append(types.InlineKeyboardButton(f"🔒 {t}", callback_data=f"inf_{owner}"))
+                else:
+                    # Свободное время
+                    btns.append(types.InlineKeyboardButton(t, callback_data=f"stme_{s_id}_{sel_date}_{t}"))
+            
+            markup.add(*btns)
+            markup.add(types.InlineKeyboardButton("🔙 Назад к календарю", callback_data=f"open_calendar_{s_id}"))
+            
+            text = (
+                f"📅 <b>Дата: {display_date}</b>\n"
+                f"❌ — отмена твоего, 🔒 — занято другими.\n"
+                f"{booked_text}"
+            )
+
+            bot.edit_message_text(
+                text,
+                call.message.chat.id, 
+                call.message.message_id, 
+                reply_markup=markup, 
+                parse_mode="HTML"
+            )
+
+        except Exception as e:
+            print(f"❌ Ошибка в select_lesson_day: {e}")
+            bot.answer_callback_query(call.id, "Ошибка при загрузке дня.")
     @bot.callback_query_handler(func=lambda call: call.data.startswith("stme_"))
     def save_lesson(call):
-        # Структура callback: stme_{s_id}_{sel_date}_{t}
         d = call.data.split("_")
-        student_id = d[1]
-        lesson_date = d[2]
-        lesson_time = d[3]
+        student_id, lesson_date, lesson_time = d[1], d[2], d[3]
         
-        # Сохраняем в базу
         db.add_lesson(student_id, lesson_date, lesson_time)
-        
-        # Всплывающее уведомление сверху
-        bot.answer_callback_query(call.id, f"✅ Записано на {lesson_time}", show_alert=False)
-        
-        # Возвращаемся в главное меню (или можно в карточку ученика)
-        ui_refs['handle_start'](call.message)
+        bot.answer_callback_query(call.id, f"✅ Записано на {lesson_time}")
+
+        # Вместо handle_start попробуй просто обновить текущий экран времени, 
+        # чтобы сразу увидеть появившийся красный крестик
+        select_lesson_day(call)
     @bot.callback_query_handler(func=lambda call: call.data.startswith("start_lesson_"))
     def start_lesson_callback(call):
         chat_id = call.message.chat.id
@@ -131,4 +162,30 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
     def handle_ignore(call):
         """Обработка нажатия на занятое время (крестик)"""
         bot.answer_callback_query(call.id, "⚠️ Это время уже занято другим учеником", show_alert=False)
-        
+    
+
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("del_les_"))
+    def handle_delete_lesson(call):
+        # Разбираем callback: del_les_{date}_{time}_{s_id}
+        # Пример: del_les_2026-05-02_09:00_5
+        parts = call.data.split("_")
+        l_date = parts[2]
+        l_time = parts[3]
+        s_id = parts[4]
+
+        # 1. Удаляем из базы
+        success = db.delete_lesson(l_date, l_time, s_id)
+
+        if success:
+            bot.answer_callback_query(call.id, "🗑️ Занятие отменено, баланс пополнен")
+        else:
+            bot.answer_callback_query(call.id, "⚠️ Ошибка при отмене", show_alert=True)
+
+        # 2. Обновляем экран (перерисовываем кнопки времени)
+        # Формируем данные для вызова select_lesson_day заново
+        # Нам нужно превратить дату обратно в формат с подчеркиваниями для d[3], d[4], d[5]
+        date_parts = l_date.split("-")
+        call.data = f"cal_day_{s_id}_{date_parts[0]}_{date_parts[1]}_{date_parts[2]}"
+
+        # Вызываем функцию выбора дня, чтобы обновить интерфейс
+        select_lesson_day(call)
