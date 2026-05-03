@@ -108,16 +108,21 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
     @bot.callback_query_handler(func=lambda call: call.data.startswith("del_les_"))
     def handle_delete_lesson(call):
         parts = call.data.split("_")
+        # Извлекаем параметры из callback_data
         l_date, l_time, s_id = parts[2], parts[3], parts[4]
 
-        success = db.lessons.delete(l_date, l_time, s_id, db.students)
+        # ВАЖНО: Добавляем False в конец, если твой метод принимает is_refund.
+        # Если ты просто удалил строку с балансом в репозитории, то аргументы остаются прежними.
+        # Но судя по твоей логике динамического расчета, баланс пересчитается сам 
+        # на основе количества оставшихся уроков в БД.
+        success, msg = db.lessons.delete(l_date, l_time, s_id, db.students)
 
         if success:
-            bot.answer_callback_query(call.id, "🗑️ Занятие отменено")
+            bot.answer_callback_query(call.id, "🗑️ Занятие удалено из календаря")
         else:
-            bot.answer_callback_query(call.id, "⚠️ Ошибка при отмене", show_alert=True)
+            bot.answer_callback_query(call.id, f"⚠️ {msg}", show_alert=True)
 
-        # Обновляем этот же экран времени
+        # Обновляем этот же экран времени, чтобы кнопка исчезла
         date_parts = l_date.split("-")
         call.data = f"cal_day_{s_id}_{date_parts[0]}_{date_parts[1]}_{date_parts[2]}"
         select_lesson_day(call)
@@ -128,25 +133,37 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
         chat_id = call.message.chat.id
         student_id = call.data.split("_")[2]
 
-        # Лоадинг (создаем новое)
-        l_id = ui_refs['show_loading'](chat_id, "⌛ <b>Фиксирую урок...</b>")
+        # 1. Вместо создания НОВОГО сообщения, редактируем текущую карточку в лоадинг
+        # Это мгновенно дает отклик без "прыжка" экрана
+        ui_refs['show_loading'](chat_id, "⌛ <b>Фиксирую урок...</b>", call=call)
 
         success, result = db.lessons.auto_lesson_check_in(student_id, db.students)
 
         if not success:
-            try: bot.delete_message(chat_id, l_id)
-            except: pass
+            # Если ошибка (урок у другого), возвращаем карточку студента назад
             bot.answer_callback_query(call.id, f"⚠️ Сейчас идет урок у: {result}", show_alert=True)
+            # Просто вызываем отрисовку карточки обратно в этом же сообщении
+            from view.student_render import render_student_card
+            student_data = db.students.get_by_id(student_id)
+            render_student_card(bot, chat_id, student_data, finance, edit_msg_id=call.message.message_id)
             return 
 
-        ui_refs['clear_screen'](chat_id, keep_msg_id=l_id)
+        # 2. Если успех — редактируем ТЕКУЩЕЕ сообщение в подтверждение
         student_data = db.students.get_by_id(student_id)
         
         markup = types.InlineKeyboardMarkup()
+        # Важно: кнопка "fast_view" уже умеет редактировать сообщение обратно в профиль
         markup.add(types.InlineKeyboardButton("🔙 В профиль", callback_data=f"fast_view_{student_id}"))
 
-        # Превращаем лоадинг в подтверждение
         bot.edit_message_text(
-            f"✅ <b>Урок зафиксирован!</b>\n👤 Ученик: <b>{student_data['name']}</b>\n⏰ Время: <b>{result}</b>",
-            chat_id, l_id, parse_mode="HTML", reply_markup=markup
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text=f"✅ <b>Урок зафиксирован!</b>\n──────────────────────────\n"
+                 f"👤 Ученик: <b>{student_data['name']}</b>\n"
+                 f"⏰ Время: <b>{result}</b>",
+            parse_mode="HTML", 
+            reply_markup=markup
         )
+        
+        # Обновляем "якорь", чтобы бот знал, что это всё еще наше главное окно
+        ui_refs['welcome_msg_id'] = call.message.message_id

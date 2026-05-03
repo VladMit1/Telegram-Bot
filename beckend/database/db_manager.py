@@ -17,8 +17,6 @@ class DBManager(BaseDB):
 
     # --- ВЫСОКОУРОВНЕВАЯ ЛОГИКА (Бизнес-логика) ---
 
-    def auto_lesson_check_in(self, student_id):
-        return self.lessons.auto_lesson_check_in(student_id, self.students)
     def set_new_lesson_price(self, s_id, new_price, current_balance):
         """Смена цены с фиксацией даты (используем метод репозитория)"""
         from datetime import datetime

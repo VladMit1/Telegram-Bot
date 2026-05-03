@@ -25,3 +25,4 @@
 **/env.bak/
 **/ENV.bak/
 __init__.py
+**/last_messages.json

@@ -9,28 +9,31 @@ class LessonRepo(BaseDB):
             (s_id, date, time, "Урок", 60), commit=True
         )
 
-    def delete(self, date, time, s_id, student_repo):
-        """Удаляет урок и возвращает стоимость урока на баланс ученика"""
+    def delete(self, date, time, s_id, student_repo, is_refund=False):
+        """
+        Удаляет урок. 
+        is_refund=True — вернуть деньги на баланс.
+        is_refund=False — просто удалить запись (по умолчанию).
+        """
         
-        # 1. Сначала узнаем стоимость урока для этого ученика
-        # Мы берем цену из карточки студента
+        # 1. Проверяем наличие ученика
         student = student_repo.get_by_id(s_id)
         if not student:
             return False, "Ученик не найден"
 
-        lesson_price = student['lesson_price']
-
         # 2. Удаляем урок
-        # Нам важно знать, был ли вообще такой урок (rowcount)
         deleted_count = self.execute(
             "DELETE FROM lessons WHERE lesson_date = ? AND lesson_time = ? AND student_id = ?",
             (date, time, s_id), commit=True
         )
 
         if deleted_count > 0:
-            # 3. Если урок удален, обновляем баланс (прибавляем цену урока обратно)
-            student_repo.update_balance(s_id, lesson_price)
-            return True, f"Урок удален, {lesson_price} PLN возвращено на баланс."
+            # 3. Возвращаем деньги ТОЛЬКО если is_refund=True
+            if is_refund:
+                lesson_price = student['lesson_price']
+                return True, f"Урок удален, {lesson_price} PLN возвращено."
+            
+            return True, "Урок удален без возврата средств."
         
         return False, "Урок не найден в базе данных."
 

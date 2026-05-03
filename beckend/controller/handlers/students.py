@@ -77,6 +77,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
         markup.add(
             types.InlineKeyboardButton("🏷️ Имя", callback_data=f"edit_name_{student_id}"),
             types.InlineKeyboardButton("💰 Цена", callback_data=f"edit_price_{student_id}"),
+            types.InlineKeyboardButton("❌ Удалить", callback_data=f"delete_student_{student_id}"),
             types.InlineKeyboardButton("🔙 В профиль", callback_data=f"fast_view_{student_id}")
         )
         
@@ -110,6 +111,58 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
         bot.edit_message_text("📝 <b>Введите данные:</b>\n<code>@username Имя</code>", 
                               call.message.chat.id, l_id, parse_mode="HTML", reply_markup=markup)
         user_data[user_id]['last_instruction_id'] = l_id
+    # --- 6. ЗАПРОС ПОДТВЕРЖДЕНИЯ УДАЛЕНИЯ ---
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("delete_student_"))
+    def ask_delete_student(call):
+        student_id = call.data.split("_")[2]
+        student = db.students.get_by_id(student_id)
+        
+        markup = types.InlineKeyboardMarkup()
+        markup.add(
+            types.InlineKeyboardButton(text=f"✅ Да, удалить (ID: {student_id})", callback_data=f"confirm_del_{student_id}"),    
+            types.InlineKeyboardButton("🔙 Отмена", callback_data=f"edit_stu_{student_id}")
+        )
+        
+        bot.edit_message_text(
+            f"❓ <b>Удалить ученика {student['name']}?</b>\n"
+            f"Данные будут перенесены в архив.",
+            call.message.chat.id, call.message.message_id,
+            reply_markup=markup, parse_mode="HTML"
+        )
+
+    # --- 7. ФИНАЛЬНОЕ УДАЛЕНИЕ + АРХИВАЦИЯ ---
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_del_"))
+    def confirm_delete_student(call):
+        print(f"!!! КНОПКА НАЖАТА !!! Data: {call.data}")
+        chat_id = call.message.chat.id
+
+        try:
+            # 1. Парсим ID
+            parts = call.data.split("_")
+            student_id = int(parts[-1])
+            print(f"DEBUG: ID извлечен: {student_id}")
+    
+            # 2. Пытаемся удалить
+            print("DEBUG: Захожу в db.students.delete_student...")
+            success, message = db.students.delete_student(student_id, finance)
+            print(f"DEBUG: Результат удаления: success={success}, msg={message}")
+
+            if success:
+                bot.answer_callback_query(call.id, "✅ Ученик заархивирован")
+                contacts = db.students.get_all()
+                
+                # ВАЖНО: Если тут упадет импорт, мы поймаем это в except
+                from view.student_render import render_student_list
+                render_student_list(bot, chat_id, contacts, finance, edit_msg_id=call.message.message_id)
+            else:
+                bot.answer_callback_query(call.id, f"🚫 {message}", show_alert=True)
+
+        except Exception as e:
+            # ЭТОТ БЛОК СПАСЕТ ОТ "ОШИБКИ 0" И ПОКАЖЕТ ПРАВДУ
+            print(f"❌ КРИТИЧЕСКАЯ ОШИБКА В ХЕНДЛЕРЕ: {e}")
+            import traceback
+            traceback.print_exc() # Выведет полную цепочку ошибки в консоль
+            bot.answer_callback_query(call.id, "⚠ Произошла внутренняя ошибка", show_alert=True)
 
 # --- ВНЕШНИЕ ФУНКЦИИ ---
 

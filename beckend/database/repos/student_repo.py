@@ -1,4 +1,5 @@
 from database.base import BaseDB
+import time 
 
 class StudentRepo(BaseDB):
     def get_all(self):
@@ -43,14 +44,43 @@ class StudentRepo(BaseDB):
         """
         return self.execute(query, (current_actual_balance, new_price, today, student_id), commit=True)
 
-    def try_delete_student(self, student_id, finance):
-        """Логика удаления с проверкой баланса"""
-        balance = finance.get_actual_balance(student_id)
+    def delete_student(self, s_id, finance):
+        # 1. Проверка долга
+        actual_balance = finance.get_actual_balance(s_id)
+        if actual_balance < 0:
+            return False, f"Должник! Баланс: {actual_balance} PLN. Удаление запрещено."
+
+        # 2. Сбор данных для архива
+        student = self.get_by_id(s_id)
+        if not student: return False, "Ученик не найден."
+
+        # Считаем итоги
+        res_paid = self.execute("SELECT SUM(amount) as total FROM payments WHERE student_id=?", (s_id,), fetchone=True)
+        total_paid = res_paid['total'] if res_paid and res_paid['total'] else 0
+
+        res_lessons = self.execute("SELECT COUNT(id) as count FROM lessons WHERE student_id=?", (s_id,), fetchone=True)
+        total_lessons = res_lessons['count'] if res_lessons and res_lessons['count'] else 0
         
-        if balance < 0:
-            return False, f"⚠️ Нельзя удалить! У ученика долг: {balance} PLN"
-        
-        # Если долга нет, удаляем (в идеале здесь нужно удалять и историю уроков/платежей)
-        # Для простоты пока удаляем только из contacts
-        self.execute("DELETE FROM contacts WHERE id = ?", (student_id,), commit=True)
-        return True, "✅ Профиль ученика успешно удален"
+        # Период (от первого контакта до сегодня)
+        period_start = student.get('created_at', 'Неизвестно')
+        period_end = time.strftime('%Y-%m-%d %H:%M:%S')
+
+        try:
+            # Используем OR REPLACE, чтобы не падать из-за дублей ID в архиве
+            self.execute(
+                """INSERT OR REPLACE INTO deleted_students 
+                    (id, name, phone, total_paid, total_lessons, period_start, period_end) 
+                    VALUES (?,?,?,?,?,?,?)""",
+                (s_id, student['name'], student['phone'], total_paid, total_lessons, period_start, period_end),
+                commit=True
+            )
+
+            # Чистим активные таблицы
+            self.execute("DELETE FROM lessons WHERE student_id = ?", (s_id,), commit=True)
+            self.execute("DELETE FROM payments WHERE student_id = ?", (s_id,), commit=True)
+            self.execute("DELETE FROM contacts WHERE id = ?", (s_id,), commit=True)
+            
+            return True, "Удалено"
+        except Exception as e:
+            print(f"КРИТИЧЕСКАЯ ОШИБКА БД: {e}") # Это увидишь в консоли
+            return False, f"Ошибка БД: {e}"

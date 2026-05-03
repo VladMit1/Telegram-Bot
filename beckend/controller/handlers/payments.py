@@ -7,7 +7,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from controller.handlers.students import register_student_handlers 
 
-def register_payment_handlers(bot, db, user_data, ui_refs):
+def register_payment_handlers(bot, db, user_data, ui_refs, finance):
 
     # --- 1. ОТКРЫТИЕ КАЛЕНДАРЯ ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("pay_") and 
@@ -72,25 +72,30 @@ def register_payment_handlers(bot, db, user_data, ui_refs):
     # --- 3. ИСТОРИЯ ПЛАТЕЖЕЙ (СПИСОК ДЛЯ УДАЛЕНИЯ) ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("history_pay_"))
     def show_payments_history(call):
-        # Здесь мы РЕДАКТИРУЕМ текущее сообщение (карточку профиля)
-        ui_refs['show_loading'](call.message.chat.id, "📁 <b>Открываю историю...</b>", call=call)
-        
         s_id = call.data.split("_")[2]
+        
+        # 1. Сначала ПРОВЕРЯЕМ базу, а не шлем лоадинг
         payments = db.payments.execute(
             "SELECT id, amount, payment_date FROM payments WHERE student_id = ? ORDER BY payment_date DESC LIMIT 10",
             (s_id,), fetchall=True
         )
     
         if not payments:
-            bot.answer_callback_query(call.id, "История пуста", show_alert=True)
-            # Если пусто, возвращаем профиль назад (тоже быстро)
-            call.data = f"fast_view_{s_id}"
-            # Здесь вызываем функцию из students (убедись, что она доступна)
+            # 2. Если пусто — просто вешаем уведомление сверху, экран не меняем
+            bot.answer_callback_query(call.id, "❌ История платежей пуста", show_alert=True)
             return
 
+        # 3. Если платежи есть — вот теперь показываем лоадинг и рендерим список
+        ui_refs['show_loading'](call.message.chat.id, "📁 <b>Открываю историю...</b>", call=call)
+        
         markup = get_payments_list_markup(s_id, payments)
+        
+        # Добавляем кнопку "Назад" в самый конец списка, если её нет в get_payments_list_markup
+        markup.add(types.InlineKeyboardButton("🔙 Назад в профиль", callback_data=f"fast_view_{s_id}"))
+
         bot.edit_message_text(
-            "🗑 <b>Выберите платеж для удаления:</b>",
+            "🗑 <b>Выберите платеж для удаления:</b>\n"
+            "<i>(Последние 10 операций)</i>",
             call.message.chat.id, call.message.message_id, 
             reply_markup=markup, parse_mode="HTML"
         )
@@ -99,26 +104,33 @@ def register_payment_handlers(bot, db, user_data, ui_refs):
     def process_delete_payment(call):
         params = call.data.split("_")
         s_id, p_id = params[2], params[3]
+        chat_id = call.message.chat.id
     
         db.payments.delete(p_id)
         bot.answer_callback_query(call.id, "✅ Платеж удален")
     
-        # Проверяем, остались ли платежи, чтобы знать, что рисовать дальше
         payments = db.payments.execute(
             "SELECT id FROM payments WHERE student_id = ? LIMIT 1", (s_id,), fetchall=True
         )
         
         if payments:
-            # Если еще есть платежи, обновляем список
-            call.data = f"history_pay_{s_id}"
             show_payments_history(call)
         else:
-            # Если пусто, возвращаемся в профиль студента
-            bot.answer_callback_query(call.id, "Все платежи удалены")
-            # Эмулируем вызов профиля (предполагается, что такой хендлер есть)
-            call.data = f"view_stu_{s_id}"
-            register_student_handlers.open_card(call)
-
+            from view.student_render import render_student_card
+            student_data = db.students.get_by_id(s_id)
+            
+            if student_data:
+                # Передаем finance (он должен быть доступен из аргументов родительской функции)
+                render_student_card(
+                    bot, 
+                    chat_id, 
+                    student_data, 
+                    finance, 
+                    is_search=True, 
+                    edit_msg_id=call.message.message_id
+                )
+            else:
+                bot.send_message(chat_id, "❌ Ошибка: ученик не найден")
 # --- 5. ОБРАБОТКА ТЕКСТОВОГО ВВОДА СУММЫ ---
 def handle_payment_text(bot, db, message, user_data, ui_refs, finance): # Добавь finance в аргументы
     user_id = message.from_user.id

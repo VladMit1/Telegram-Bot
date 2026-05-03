@@ -58,7 +58,7 @@ def register_handlers(bot, finance):
     # Регистрация Callback-обработчиков
     ui_refs['handle_start'] = register_common_handlers(bot, db, finance, user_data, ui_refs)
     register_student_handlers(bot, db, user_data, ui_refs, finance)
-    register_payment_handlers(bot, db, user_data, ui_refs)
+    register_payment_handlers(bot, db, user_data, ui_refs, finance)
     register_lesson_handlers(bot, db, ui_refs, finance)
 
     # Единый обработчик текста
