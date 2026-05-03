@@ -71,6 +71,6 @@ def create_calendar(student_id, year=None, month=None, mode="view", highlight_da
     # 4. ФУТЕР-МАЯК (Раз перенос не работает, сделаем легенду внизу)
     legend = "🔹 - уроки  |  💰 - оплаты  |  • - сегодня"
     markup.row(types.InlineKeyboardButton(legend, callback_data="ignore"))
-    markup.row(types.InlineKeyboardButton("🔙 Назад к профилю", callback_data=f"view_stu_{student_id}"))
+    markup.row(types.InlineKeyboardButton("🔙 Назад к профилю", callback_data=f"fast_view_{student_id}"))
     
     return markup

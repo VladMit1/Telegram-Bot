@@ -17,15 +17,41 @@ ui_refs = {
 
 def register_handlers(bot, finance):
     
-    def clear_screen(chat_id):
-        if ui_refs['welcome_msg_id']:
+    # --- УНИВЕРСАЛЬНЫЙ ЛОАДИНГ ---
+    def show_loading(chat_id, text="⌛ <b>Загрузка...</b>", call=None):
+        """
+        Если передан call, редактирует старое сообщение (без прыжков).
+        Если call нет, шлет новое сообщение.
+        """
+        if call:
+            try:
+                bot.edit_message_text(text, chat_id, call.message.message_id, parse_mode="HTML")
+                return call.message.message_id
+            except: pass
+        
+        # Если редактирование не вышло или это новый процесс
+        msg = bot.send_message(chat_id, text, parse_mode="HTML")
+        return msg.message_id
+
+    ui_refs['show_loading'] = show_loading
+
+    # --- УНИВЕРСАЛЬНЫЙ ОЧИСТКА ЭКРАНА ---
+    def clear_screen(chat_id, keep_msg_id=None):
+        # Удаляем приветствие, если оно не является "якорем"
+        if ui_refs['welcome_msg_id'] and ui_refs['welcome_msg_id'] != keep_msg_id:
             try: bot.delete_message(chat_id, ui_refs['welcome_msg_id'])
             except: pass
             ui_refs['welcome_msg_id'] = None
+
+        # Удаляем все карточки из поиска, кроме "якоря"
+        new_results = []
         for m_id in ui_refs['search_results_ids']:
-            try: bot.delete_message(chat_id, m_id)
-            except: pass
-        ui_refs['search_results_ids'].clear()
+            if m_id == keep_msg_id:
+                new_results.append(m_id)
+            else:
+                try: bot.delete_message(chat_id, m_id)
+                except: pass
+        ui_refs['search_results_ids'] = new_results
 
     ui_refs['clear_screen'] = clear_screen
 
@@ -51,7 +77,7 @@ def register_handlers(bot, finance):
         
         # 2. Если ждем сумму денег
         elif step == 'waiting_pay_amount':
-            handle_payment_text(bot, db, message, user_data, ui_refs)
+            handle_payment_text(bot, db, message, user_data, ui_refs, finance)
             
         # 3. Если ждем новую цену (Маяк)
         elif step == 'waiting_new_price':
@@ -69,7 +95,7 @@ def register_handlers(bot, finance):
                 # Вместо цикла for r in results:
                 # Импортируем и вызываем рендер списка
                 
-                m_id = render_student_list(bot, chat_id, results, finance)
+                m_id = render_student_list(bot, chat_id, results, finance, edit_msg_id=ui_refs['welcome_msg_id'])
                 
                 # Добавляем ID сообщения в список для будущей очистки
                 ui_refs['search_results_ids'].append(m_id)

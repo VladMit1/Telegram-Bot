@@ -1,6 +1,7 @@
 import threading
 import uvicorn
 import telebot
+import time
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -31,8 +32,13 @@ app.add_middleware(
 
 
 def run_bot():
-    print("🤖 Бот запущен...")
-    bot.polling(none_stop=True)
+    print("🤖 Бот запущен и ожидает сеть...")
+    while True:
+        try:
+            bot.polling(none_stop=True, timeout=60, long_polling_timeout=60)
+        except Exception as e:
+            print(f"❌ Ошибка подключения бота: {e}")
+            time.sleep(10)  # Подождать 10 секунд перед следующей попыткой
 
 if __name__ == "__main__":
     # Запуск бота в потоке
