@@ -99,7 +99,10 @@ def render_student_list(bot, chat_id, students, finance, edit_msg_id=None):
             status_emoji, _ = finance.get_financial_status(s_id, balance)
             student_rows.append(f"{i}. {status_emoji} /id{s_id} — <b>{s_name}</b> (<code>{balance}</code>)")
 
-        markup.add(types.InlineKeyboardButton("➕ Добавить нового ученика", callback_data="add_student"))
+        markup.add( types.InlineKeyboardButton("➕ Добавить нового ученика", callback_data="add_student"),
+                    types.InlineKeyboardButton("📅 Календарь занятий", callback_data="calendar_full_view"),
+                    types.InlineKeyboardButton("📊 Финансы",callback_data="finance_view"),
+                    )
         msg_text = (f"📋 <b>База учеников</b>\n──────────────────────────\n"
                     f"{'\n'.join(student_rows)}\n──────────────────────────\n"
                     f"<i>Нажмите на номер /id для просмотра профиля</i>")

@@ -2,6 +2,14 @@ import time
 from telebot import types
 from view.student_render import render_student_card
 import threading
+from view.student_render import render_student_list
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from database.db_manager import db # Импортируем базу
+from view.pay_render import get_payments_list_markup
+from view.calendar_view import create_calendar
+from datetime import datetime
 
 def register_student_handlers(bot, db, user_data, ui_refs, finance):
     @bot.message_handler(content_types=['contact'])
@@ -208,6 +216,79 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
                 types.InlineKeyboardButton("🔙 Отмена", callback_data=f"edit_stu_{student_id}")
             )
         )
+    @bot.callback_query_handler(func=lambda call: call.data == "calendar_full_view")
+    def show_main_calendar(call):
+        # Берем текущую дату
+        now = datetime.now()
+    
+        # Генерируем календарь: 
+        # student_id="all" (смотрим всех)
+        # mode="view" (режим просмотра занятий)
+        markup = create_calendar(
+            student_id="all", 
+            year=now.year, 
+            month=now.month, 
+            mode="view"
+        )
+
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text="🗓 <b>Общий график занятий</b>\n\nНиже представлена ваша загрузка. Дни с уроками помечены маркером 🔹. Нажмите на день для просмотра деталей.",
+            reply_markup=markup,
+            parse_mode="HTML"
+        )
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("all_cal_day_"))
+    def show_all_lessons_on_day(call):
+        try:
+            params = call.data.split("_")
+            # Индексы зависят от того, как ты формируешь callback: all_cal_day_YYYY_M_D
+            year, month, day = params[3], params[4], params[5]
+            date_str = f"{year}-{int(month):02d}-{int(day):02d}"
+
+            query = """
+                SELECT l.lesson_time, c.name 
+                FROM lessons l
+                JOIN contacts c ON l.student_id = c.id
+                WHERE date(l.lesson_date) = date(?)
+                ORDER BY l.lesson_time ASC
+            """
+            
+            # ВАЖНО: убедись, что fetchall=True реально возвращает пустой список [], а не None
+            lessons = db.execute(query, (date_str,), fetchall=True) or []
+
+            text = f"🗓 <b>Занятия на {day}.{month}.{year}</b>\n"
+            text += "──────────────────────────\n"
+
+            if not lessons:
+                text += "Записей не найдено. 🤷‍♂️"
+            else:
+                for res in lessons:
+                    # Твой BaseDB возвращает dict, поэтому используем ключи из SQL-запроса
+                    time_val = res.get('lesson_time', '--:--')
+                    name_val = res.get('name', 'Ученик')
+                    # Можно даже тему добавить, если она есть в запросе
+                    topic_val = res.get('topic', '')
+                    
+                    text += f"🕒 <code>{time_val}</code> — <b>{name_val}</b>\n"
+                    if topic_val:
+                        text += f"📝 <i>{topic_val}</i>\n"
+                    text += "\n" # Отступ между уроками
+
+            markup = types.InlineKeyboardMarkup()
+            # Исправляем callback возврата, чтобы он совпадал с твоим навигатором
+            markup.add(types.InlineKeyboardButton("🔙 К календарю", callback_data=f"cal_nav_all_view_{year}_{month}"))
+            
+            bot.edit_message_text(
+                text, call.message.chat.id, call.message.message_id, 
+                reply_markup=markup, parse_mode="HTML"
+            )
+            
+        except Exception as e:
+            # Чтобы в консоли видеть РЕАЛЬНУЮ ошибку, а не просто "0"
+            import traceback
+            print(f"❌ Ошибка календаря детализированно:\n{traceback.format_exc()}")
+            bot.answer_callback_query(call.id, f"Ошибка: {e}")
 # --- ВНЕШНИЕ ФУНКЦИИ ---
 
 def handle_student_text(bot, db, message, user_data, ui_refs):

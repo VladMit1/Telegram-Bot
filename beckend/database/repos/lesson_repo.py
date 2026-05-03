@@ -84,23 +84,7 @@ class LessonRepo(BaseDB):
             return [int(str(r['lesson_date']).split('-')[2]) for r in rows]
         except (IndexError, TypeError, KeyError):
             return []
-    def get_all_busy_days(self, year, month):
-        """Дни занятий ВСЕХ учеников для общего календаря"""
-        # Формируем строку поиска '2026-05-%'
-        month_str = f"{year}-{str(month).zfill(2)}%"
-        
-        query = "SELECT DISTINCT lesson_date FROM lessons WHERE lesson_date LIKE ?"
-        rows = self.execute(query, (month_str,), fetchall=True)
-        
-        if not isinstance(rows, list):
-            return []
-
-        try:
-            # Извлекаем только число дня из строки '2026-05-02'
-            return [int(str(r['lesson_date']).split('-')[2]) for r in rows]
-        except (IndexError, TypeError, KeyError):
-            return []
-
+    
     # Файл: database/repos/lesson_repo.py
     def get_lesson_id(self, date, time, student_id):
         row = self.execute(
@@ -147,3 +131,13 @@ class LessonRepo(BaseDB):
 
         except Exception as e:
             return False, f"Ошибка: {e}"
+    def get_all_busy_days(self, year, month):
+        query = """
+            SELECT DISTINCT strftime('%d', lesson_date) 
+            FROM lessons 
+            WHERE strftime('%Y', lesson_date) = ? 
+            AND strftime('%m', lesson_date) = ?
+        """
+        # Передаем месяц с ведущим нулем (05, а не 5)
+        res = self.execute(query, (str(year), f"{month:02d}"), fetchall=True)
+        return [int(row[0]) for row in res] if res else []

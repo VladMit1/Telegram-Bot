@@ -20,7 +20,7 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
         
         if not contacts:
             msg = bot.send_message(chat_id, "👋 <b>База пуста. Добавьте первого ученика:</b>", 
-                                   parse_mode="HTML", reply_markup=get_main_markup())
+                                    parse_mode="HTML", reply_markup=get_main_markup())
             ui_refs['welcome_msg_id'] = msg.message_id
         else:
             # При /start шлем новое сообщение (потому что старых нет)
@@ -68,15 +68,25 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
     @bot.callback_query_handler(func=lambda call: call.data.startswith("cal_nav_"))
     def handle_calendar_navigation(call):
         params = call.data.split("_")
-        student_id = params[2]
+        # params[0]=cal, params[1]=nav, params[2]=student_id, params[3]=mode...
+        student_id = params[2] 
         mode = params[3]
         year = int(params[4])
         month = int(params[5])
 
         highlight_dates = None
-        if mode == "pay":
+    
+        # ЛОГИКА ЗАГОЛОВКА
+        if student_id == "all":
+            text = "📅 <b>Общий календарь загрузки:</b>"
+        else:
+            text = "💳 <b>Финансовый календарь:</b>" if mode == "pay" else "📅 <b>Расписание занятий:</b>"
+
+        # ЛОГИКА ПОДСВЕТКИ (только для платежей конкретного студента)
+        if mode == "pay" and student_id != "all":
             highlight_dates = db.payments.get_dates_by_student(student_id)
 
+        # Генерация обновленного календаря
         markup = create_calendar(
             student_id=student_id, 
             year=year, 
@@ -84,8 +94,6 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
             mode=mode, 
             highlight_dates=highlight_dates
         )
-
-        text = "💳 <b>Финансовый календарь:</b>" if mode == "pay" else "📅 <b>Расписание занятий:</b>"
 
         try:
             bot.edit_message_text(
@@ -95,7 +103,6 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
                 reply_markup=markup,
                 parse_mode="HTML"
             )
-        except Exception:
+        except Exception as e:
+            print(f"Navigation error: {e}")
             pass
-
-    return handle_start

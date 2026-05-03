@@ -159,11 +159,12 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
             chat_id=chat_id,
             message_id=call.message.message_id,
             text=f"✅ <b>Урок зафиксирован!</b>\n──────────────────────────\n"
-                 f"👤 Ученик: <b>{student_data['name']}</b>\n"
-                 f"⏰ Время: <b>{result}</b>",
+                f"👤 Ученик: <b>{student_data['name']}</b>\n"
+                f"⏰ Время: <b>{result}</b>",
             parse_mode="HTML", 
             reply_markup=markup
         )
         
         # Обновляем "якорь", чтобы бот знал, что это всё еще наше главное окно
         ui_refs['welcome_msg_id'] = call.message.message_id
+    
