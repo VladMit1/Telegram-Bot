@@ -13,9 +13,9 @@ def create_calendar(student_id, year=None, month=None, mode="view", highlight_da
     w = "⠀" 
     
     if student_id == "all":
-        busy_days = db.get_all_busy_days(curr_year, curr_month)
+        busy_days = busy_days = db.lessons.get_all_busy_days(curr_year, curr_month)
     else:
-        busy_days = db.get_busy_days(student_id, curr_year, curr_month)
+        busy_days = db.lessons.get_student_busy_days(student_id, curr_year, curr_month)
 
     markup = types.InlineKeyboardMarkup(row_width=7)
     

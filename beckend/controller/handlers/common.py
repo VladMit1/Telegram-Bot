@@ -18,7 +18,7 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
         # Полная очистка экрана
         ui_refs['clear_screen'](chat_id)
         
-        contacts = db.get_all() # Получаем всех учеников
+        contacts = db.students.get_all()
         
         if not contacts:
             msg = bot.send_message(chat_id, "👋 <b>База пуста. Добавьте первого ученика:</b>", 
@@ -50,7 +50,7 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
 
         highlight_dates = None
         if mode == "pay":
-            highlight_dates = db.get_payment_dates(student_id)
+            highlight_dates = db.payments.get_dates_by_student(student_id)
 
         markup = create_calendar(
             student_id=student_id, 

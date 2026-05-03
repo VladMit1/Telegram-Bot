@@ -5,6 +5,7 @@ from controller.handlers.common import register_common_handlers
 from controller.handlers.students import register_student_handlers, handle_student_text,handle_price_update
 from controller.handlers.payments import register_payment_handlers, handle_payment_text
 from controller.handlers.lessons import register_lesson_handlers
+from view.student_render import render_student_list
 
 user_data = {}
 ui_refs = {
@@ -59,7 +60,7 @@ def register_handlers(bot, finance):
         # 4. ПОИСК (теперь возвращает список имен)
         else:
             text_query = message.text.strip()
-            results = db.search_contacts(text_query)
+            results = db.students.search(text_query)
             
             if results:
                 # Очищаем экран от предыдущих списков/карточек
@@ -67,7 +68,6 @@ def register_handlers(bot, finance):
                 
                 # Вместо цикла for r in results:
                 # Импортируем и вызываем рендер списка
-                from view.student_render import render_student_list
                 
                 m_id = render_student_list(bot, chat_id, results, finance)
                 

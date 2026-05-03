@@ -2,34 +2,44 @@ import sys
 import os
 from telebot import types
 
-# Добавляем корневую папку проекта в пути поиска Python
+# Твои импорты путей
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from helper.ui_utils import save_last_msg, delete_last_msg
-# Импортируем наш умный сборщик кнопок
 from helper.button_text_align import AlignedMarkup
-
 def get_main_markup():
     """Главное меню (одиночная кнопка)"""
     builder = AlignedMarkup(row_width=1)
     builder.add("➕ Добавить ученика", callback_data="add_student")
     return builder.get_markup()
-
 def render_student_card(bot, chat_id, student_data, finance, is_edit=False, is_search=False, show_add_button=False):
-    """Карточка ученика с ровными кнопками и прямой ссылкой на чат"""
-    student_id = student_data[0]
-    name = student_data[1]
-    phone = student_data[2]
-    date_added = student_data[3]
-    photo_id = student_data[4]
-    username = student_data[11]
+    """Карточка ученика (Адаптированная под словари)"""
     
-    actual_balance = finance.get_actual_balance(student_id)
-    status_emoji, status_text = finance.get_financial_status(student_id, actual_balance)
+    # ПРОВЕРКА: Если вдруг пришел список (старый формат), 
+    # этот блок позволит коду не упасть, но лучше везде использовать словари
+    if isinstance(student_data, (list, tuple)):
+        # Если пришел кортеж, превращаем в словарь (на всякий случай)
+        s_id = student_data[0]
+        name = student_data[1]
+        phone = student_data[2]
+        date_added = student_data[3]
+        photo_id = student_data[4]
+        username = student_data[11] if len(student_data) > 11 else "None"
+    else:
+        # ОСНОВНОЙ ВАРИАНТ (Словарь из нового StudentRepo)
+        s_id = student_data['id']
+        name = student_data['name']
+        phone = student_data['phone']
+        date_added = student_data['created_at'] # В базе поле называется created_at
+        photo_id = student_data['photo_id']
+        username = student_data['username']
+    
+    actual_balance = finance.get_actual_balance(s_id)
+    status_emoji, status_text = finance.get_financial_status(s_id, actual_balance)
 
     width_fixer = "ㅤ" * 22 
     divider = "──────────────────────────"
     
-    # Логика ссылки на чат
+    # Твоя логика ссылки на чат
     target = None
     if phone and not str(phone).startswith('id_'):
         target = phone
@@ -38,18 +48,19 @@ def render_student_card(bot, chat_id, student_data, finance, is_edit=False, is_s
 
     chat_url = f"https://t.me/{str(target).replace('@', '').strip()}" if target else None
 
-    # Конструктор кнопок
+    # Конструктор кнопок (твоя AlignedMarkup)
     builder = AlignedMarkup(row_width=2)
     if chat_url:
         builder.add("💬 Написать", url=chat_url)
     else:
         builder.add("💬 ———", callback_data="none")
     
-    builder.add("📅 График", callback_data=f"open_calendar_{student_id}")
-    builder.add("🎥 Урок", callback_data=f"start_lesson_{student_id}")
-    builder.add("💳 Пополнить", callback_data=f"pay_{student_id}")
-    builder.add("📊 Отчет", web_app=types.WebAppInfo(url=f"https://vladmit1.github.io/Telegram-Bot/?studentId={student_id}"))
-    builder.add("⚙️ Опции", callback_data=f"edit_stu_{student_id}")
+    builder.add("📅 График", callback_data=f"open_calendar_{s_id}")
+    builder.add("🎥 Урок", callback_data=f"start_lesson_{s_id}")
+    builder.add("💳 Пополнить", callback_data=f"pay_{s_id}")
+    builder.add("📋 Платежи", callback_data=f"history_pay_{s_id}")
+    builder.add("📊 Отчет", web_app=types.WebAppInfo(url=f"https://vladmit1.github.io/Telegram-Bot/?studentId={s_id}"))
+    builder.add("⚙️ Опции", callback_data=f"edit_stu_{s_id}")
 
     markup = builder.get_markup()
     
@@ -71,28 +82,24 @@ def render_student_card(bot, chat_id, student_data, finance, is_edit=False, is_s
                f"{status_emoji} <b>Статус:</b> {status_text}\n"
                f"{width_fixer}")
     
-    # ОЧИСТКА: Удаляем предыдущее сообщение перед отправкой нового
     delete_last_msg(bot, chat_id)
 
     try:
-        if photo_id:
+        if photo_id and str(photo_id) != "None":
             sent_msg = bot.send_photo(chat_id, photo_id, caption=caption, parse_mode="HTML", reply_markup=markup)
         else:
             sent_msg = bot.send_message(chat_id, caption, parse_mode="HTML", reply_markup=markup)
         
-        # ЗАПОМИНАЕМ: Сохраняем ID новой карточки
         save_last_msg(chat_id, sent_msg.message_id)
         return sent_msg.message_id
-    except Exception as e:
+    except Exception:
         sent_msg = bot.send_message(chat_id, caption, parse_mode="HTML", reply_markup=markup)
         save_last_msg(chat_id, sent_msg.message_id)
         return sent_msg.message_id
 
 def render_student_list(bot, chat_id, students, finance):
-    """Список учеников с командами /id"""
+    """Список учеников (Адаптированный под словари)"""
     markup = types.InlineKeyboardMarkup()
-    
-    # ОЧИСТКА: Удаляем старую карточку перед показом списка
     delete_last_msg(bot, chat_id)
 
     if not students:
@@ -104,7 +111,10 @@ def render_student_list(bot, chat_id, students, finance):
 
     student_rows = []
     for i, s in enumerate(students, 1):
-        s_id, s_name = s[0], s[1]
+        # Используем ключи словаря вместо индексов s[0], s[1]
+        s_id = s['id']
+        s_name = s['name']
+        
         balance = finance.get_actual_balance(s_id)
         status_emoji, _ = finance.get_financial_status(s_id, balance)
         student_rows.append(f"{i}. {status_emoji} /id{s_id} — <b>{s_name}</b> (<code>{balance}</code>)")

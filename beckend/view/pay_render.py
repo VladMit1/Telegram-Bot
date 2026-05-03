@@ -16,7 +16,7 @@ def render_pay_pad(bot, chat_id, student_data, selected_date=None):
    
    # 1. Получаем историю платежей для отображения монеток
    # Тебе нужно будет добавить метод get_payments_dates в DBManager
-   payment_dates = db.get_payment_dates(student_id) 
+   payment_dates = db.payments.get_dates_by_student(student_id)
    
    # 2. Создаем календарь
    # Мы используем твой create_calendar, но добавим в него логику "монеток"
@@ -34,3 +34,19 @@ def render_pay_pad(bot, chat_id, student_data, selected_date=None):
                f"Выберите дату на календаре (💰 — дни оплат) и нажмите кнопку ниже, чтобы ввести сумму.")
 
    return bot.send_message(chat_id, caption, reply_markup=markup, parse_mode="HTML").message_id
+
+# В файле, где у тебя лежат функции интерфейса (например, ui_helpers.py или в самом хендлере)
+
+def get_payments_list_markup(student_id, payments):
+    markup = types.InlineKeyboardMarkup()
+    for p in payments:
+        # p['payment_date'] и p['amount'] зависят от того, как возвращает БД (dict или tuple)
+        btn_text = f"❌ {p['payment_date']} — {p['amount']} PLN"
+        # Передаем ID платежа для удаления
+        markup.add(types.InlineKeyboardButton(
+            text=btn_text, 
+            callback_data=f"del_pay_{student_id}_{p['id']}"
+        ))
+    
+    markup.add(types.InlineKeyboardButton("🔙 Назад", callback_data=f"view_stu_{student_id}"))
+    return markup

@@ -1,0 +1,137 @@
+from database.base import BaseDB
+from typing import Any, cast
+class LessonRepo(BaseDB):
+    def add(self, s_id, date, time, student_repo):
+    # ТОЛЬКО запись об уроке. 
+    # Формула сама увидит новый урок и вычтет цену при расчете.
+        return self.execute(
+            "INSERT INTO lessons (student_id, lesson_date, lesson_time, topic, duration) VALUES (?,?,?,?,?)",
+            (s_id, date, time, "Урок", 60), commit=True
+        )
+
+    def delete(self, date, time, s_id, student_repo):
+        """Удаляет урок и возвращает стоимость урока на баланс ученика"""
+        
+        # 1. Сначала узнаем стоимость урока для этого ученика
+        # Мы берем цену из карточки студента
+        student = student_repo.get_by_id(s_id)
+        if not student:
+            return False, "Ученик не найден"
+
+        lesson_price = student['lesson_price']
+
+        # 2. Удаляем урок
+        # Нам важно знать, был ли вообще такой урок (rowcount)
+        deleted_count = self.execute(
+            "DELETE FROM lessons WHERE lesson_date = ? AND lesson_time = ? AND student_id = ?",
+            (date, time, s_id), commit=True
+        )
+
+        if deleted_count > 0:
+            # 3. Если урок удален, обновляем баланс (прибавляем цену урока обратно)
+            student_repo.update_balance(s_id, lesson_price)
+            return True, f"Урок удален, {lesson_price} PLN возвращено на баланс."
+        
+        return False, "Урок не найден в базе данных."
+
+    def get_booked_by_date(self, date):
+        query = """
+            SELECT l.lesson_time, l.student_id, c.name 
+            FROM lessons l JOIN contacts c ON l.student_id = c.id 
+            WHERE l.lesson_date = ?
+        """
+        rows = self.execute(query, (date,), fetchall=True)
+        
+        # Если rows не список, возвращаем пустой словарь
+        if not isinstance(rows, list):
+            return {}
+
+        # Безопасная сборка словаря по именам колонок
+        return {
+            r['lesson_time']: {'id': r['student_id'], 'name': r['name']} 
+            for r in rows
+        }
+
+    def get_student_busy_days(self, s_id, year, month):
+        month_str = f"{year}-{str(month).zfill(2)}%"
+        rows = self.execute(
+            "SELECT DISTINCT lesson_date FROM lessons WHERE student_id = ? AND lesson_date LIKE ?",
+            (s_id, month_str), 
+            fetchall=True
+        )
+        
+        # Проверка: если execute вернул число (int), значит данных нет или ошибка
+        if not isinstance(rows, list):
+            return []
+
+        # Извлекаем день из даты 'YYYY-MM-DD'
+        # Обращаемся к row['lesson_date'], это надежнее чем row[0]
+        try:
+            return [int(str(r['lesson_date']).split('-')[2]) for r in rows]
+        except (IndexError, TypeError, KeyError):
+            return []
+    def get_all_busy_days(self, year, month):
+        """Дни занятий ВСЕХ учеников для общего календаря"""
+        # Формируем строку поиска '2026-05-%'
+        month_str = f"{year}-{str(month).zfill(2)}%"
+        
+        query = "SELECT DISTINCT lesson_date FROM lessons WHERE lesson_date LIKE ?"
+        rows = self.execute(query, (month_str,), fetchall=True)
+        
+        if not isinstance(rows, list):
+            return []
+
+        try:
+            # Извлекаем только число дня из строки '2026-05-02'
+            return [int(str(r['lesson_date']).split('-')[2]) for r in rows]
+        except (IndexError, TypeError, KeyError):
+            return []
+
+    # Файл: database/repos/lesson_repo.py
+    def get_lesson_id(self, date, time, student_id):
+        row = self.execute(
+            "SELECT id FROM lessons WHERE lesson_date = ? AND lesson_time = ?", 
+            (date, time), 
+            fetchone=True
+        )
+        # Теперь анализатор знает, что row - это словарь, и разрешает ['id']
+        if row:
+            return row['id'] 
+        return None
+    # database/repos/lesson_repo.py
+
+    def auto_lesson_check_in(self, student_id, student_repo):
+        """Логика автоматической отметки урока с округлением до часа"""
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        
+        # Логика округления: 
+        # Если 31 минута и больше — прибавляем час и зануляем минуты.
+        # Если 30 минут и меньше — просто зануляем минуты.
+        if now.minute > 30:
+            rounded_time = now + timedelta(hours=1)
+            time_str = rounded_time.strftime("%H:00")
+        else:
+            time_str = now.strftime("%H:00")
+            
+        date_str = now.strftime("%Y-%m-%d")
+        
+        try:
+            # Проверяем, нет ли уже урока на этот час, чтобы не плодить дубликаты
+            existing = self.execute(
+                "SELECT id FROM lessons WHERE student_id = ? AND lesson_date = ? AND lesson_time = ?",
+                (student_id, date_str, time_str), fetchone=True
+            )
+            
+            if existing:
+                return False, f"⚠️ Урок на {time_str} уже отмечен!"
+
+            # Вызываем твой метод add
+            success = self.add(student_id, date_str, time_str, student_repo)
+            
+            if success:
+                return True, f"✅ Урок записан на {time_str}"
+            return False, "❌ Ошибка при сохранении урока"
+            
+        except Exception as e:
+            return False, f"Ошибка: {e}"

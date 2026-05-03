@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import TOKEN, DB_PATH
 from service.finance_manager import FinanceManager
 from controller.bot_logic import register_handlers
-from api.routes import router
 
 if not TOKEN:
     raise ValueError("❌ BOT_TOKEN не найден в .env!")
@@ -30,7 +29,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router, prefix="/api")
 
 def run_bot():
     print("🤖 Бот запущен...")
@@ -38,8 +36,9 @@ def run_bot():
 
 if __name__ == "__main__":
     # Запуск бота в потоке
-    threading.Thread(target=run_bot, daemon=True).start()
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
     
     # Запуск FastAPI
     print(f"🚀 API доступно на порту 8000")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, workers=1)

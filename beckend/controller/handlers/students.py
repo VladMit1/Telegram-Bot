@@ -17,6 +17,24 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
         sent_msg = bot.send_message(call.message.chat.id, "📝 <b>Введите данные:</b>\n<code>@username Имя</code>", 
                                     parse_mode="HTML", reply_markup=markup)
         user_data[user_id]['last_instruction_id'] = sent_msg.message_id
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_price_"))
+    def edit_price_init(call):
+        student_id = call.data.split("_")[2]
+        user_id = call.from_user.id
+        chat_id = call.message.chat.id
+
+        # Удаляем меню настроек сразу
+        try: bot.delete_message(chat_id, call.message.message_id)
+        except: pass
+        
+        user_data[user_id] = {
+            'step': 'waiting_new_price',
+            'edit_student_id': student_id
+        }
+        
+        sent_msg = bot.send_message(chat_id, "💰 <b>Введите новую цену за урок (PLN):</b>", parse_mode="HTML")
+        # Сохраняем ID инструкции, чтобы потом её удалить
+        user_data[user_id]['last_instruction_id'] = sent_msg.message_id
     @bot.callback_query_handler(func=lambda call: call.data.startswith("view_stu_"))
     def open_card(call):
         chat_id = call.message.chat.id
@@ -33,7 +51,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
         ui_refs['clear_screen'](chat_id)
 
         # 3. Получаем данные и рендерим карточку
-        student_data = db.get_student_by_id(student_id)
+        student_data = db.students.get_by_id(student_id)
 
         if student_data:
             m_id = render_student_card(
@@ -63,7 +81,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
         # 3. Очищаем массив (на случай если там что-то было)
         ui_refs['clear_screen'](chat_id)
 
-        student_data = db.get_student_by_id(student_id)
+        student_data = db.students.get_by_id(student_id)
         if student_data:
             m_id = render_student_card(bot, chat_id, student_data, finance, is_search=True)
             ui_refs['search_results_ids'].append(m_id)
@@ -76,7 +94,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
     
         # Снова вызываем поиск или показываем всех (зависит от твоей логики)
         # Если хочешь просто показать всех:
-        results = db.get_all_contacts() 
+        results = db.students.get_all()
         from view.student_render import render_student_list
         m_id = render_student_list(bot, chat_id, results, finance)
         ui_refs['search_results_ids'].append(m_id)
@@ -84,7 +102,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
     def student_settings(call):
         student_id = call.data.split("_")[2]
         # Получаем полные данные ученика
-        student = db.get_student_by_id(student_id) 
+        student = db.students.get_by_id(student_id)
 
         if not student:
             bot.answer_callback_query(call.id, "❌ Ученик не найден")
@@ -92,9 +110,10 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
 
         # Распаковываем нужные данные (индексы зависят от твоей БД, обычно: 0-id, 1-name, 7-price)
         # Предположим, цена урока лежит в student[7], а телефон в student[2]
-        name = student[1]
-        phone = student[2] if not str(student[2]).startswith('id_') else "Не указан"
-        lesson_price = student[9] if len(student) > 9 else "Не задана"
+        name = student['name']
+        raw_phone = student['phone']
+        phone = raw_phone if not str(raw_phone).startswith('id_') else "Не указан"
+        lesson_price = student['lesson_price']
 
         try: 
             bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -120,13 +139,13 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
         )
     
         bot.send_message(call.message.chat.id, settings_text, 
-                     reply_markup=markup, parse_mode="HTML")
+                    reply_markup=markup, parse_mode="HTML")
     @bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_delete_"))
     def confirm_delete_student(call):
         student_id = call.data.split("_")[2]
 
         # Вызываем наш метод с проверкой
-        success, message = db.try_delete_student(student_id, finance)
+        success, message = db.students.try_delete_student(student_id, finance)
     
         if success:
             # Если удалили — уведомляем и возвращаемся в список
@@ -148,7 +167,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
         username = "None" # В карточке контакта username обычно не передается
 
         # Сохраняем в базу
-        db.add_contact(full_name, phone, None, chat_id, username)
+        db.students.add_contact(full_name, phone, None, chat_id, username)
         
         # Сбрасываем шаги и обновляем экран
         user_id = message.from_user.id
@@ -168,7 +187,7 @@ def handle_student_text(bot, db, message, user_data, ui_refs):
     username = parts[0] if parts[0].startswith('@') else "None"
     name = " ".join(parts[1:]) if username != "None" and len(parts) > 1 else text.replace('@', '')
 
-    if username != "None" and db.search_contacts(username):
+    if username != "None" and db.students.search(username):
         err = bot.send_message(chat_id, f"⚠️ Ученик <b>{username}</b> уже есть!")
         try: bot.delete_message(chat_id, message.message_id)
         except: pass
@@ -177,7 +196,7 @@ def handle_student_text(bot, db, message, user_data, ui_refs):
         except: pass
         return
 
-    db.add_contact(name, f"id_{int(time.time())}", None, chat_id, username)
+    db.students.add_contact(name, f"id_{int(time.time())}", None, chat_id, username)
     if state.get('last_instruction_id'):
         try: bot.delete_message(chat_id, state['last_instruction_id'])
         except: pass
@@ -189,24 +208,7 @@ def handle_student_text(bot, db, message, user_data, ui_refs):
 
     # Инициализация смены цены
     # Если ты передаешь его как user_data, используй его везде внутри этой функции
-    @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_price_"))
-    def edit_price_init(call):
-        student_id = call.data.split("_")[2]
-        user_id = call.from_user.id
-        chat_id = call.message.chat.id
 
-        # Удаляем меню настроек сразу
-        try: bot.delete_message(chat_id, call.message.message_id)
-        except: pass
-        
-        user_data[user_id] = {
-            'step': 'waiting_new_price',
-            'edit_student_id': student_id
-        }
-        
-        sent_msg = bot.send_message(chat_id, "💰 <b>Введите новую цену за урок (PLN):</b>", parse_mode="HTML")
-        # Сохраняем ID инструкции, чтобы потом её удалить
-        user_data[user_id]['last_instruction_id'] = sent_msg.message_id
 def handle_price_update(bot, db, finance, message, user_id, student_id, user_data, ui_refs):
     chat_id = message.chat.id
     try:
@@ -214,7 +216,7 @@ def handle_price_update(bot, db, finance, message, user_id, student_id, user_dat
         
         # 1. Логика БД
         current_balance = finance.get_actual_balance(student_id)
-        success = db.set_new_lesson_price(student_id, new_price, current_balance)
+        success = db.students.set_new_lesson_price(student_id, new_price, current_balance)
         
         if success:
             state = user_data.get(user_id, {})
@@ -229,7 +231,7 @@ def handle_price_update(bot, db, finance, message, user_id, student_id, user_dat
             except: pass
 
             # Возвращаемся в карточку ученика, чтобы увидеть обновленную цену
-            student_data = db.get_student_by_id(student_id)
+            student_data = db.students.get_by_id(student_id)
             if student_data:
                 render_student_card(bot, chat_id, student_data, finance, is_search=True)
             

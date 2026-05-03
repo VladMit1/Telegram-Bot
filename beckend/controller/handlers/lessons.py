@@ -32,8 +32,7 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
             display_date = f"{day}.{month}.{year}"
 
             # 1. Получаем детали из базы
-            booked = db.get_booked_details(sel_date)
-            
+            booked = db.lessons.get_booked_by_date(sel_date) 
             # 2. Формируем текст занятых слотов
             booked_text = ""
             if booked:
@@ -92,7 +91,8 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
         d = call.data.split("_")
         student_id, lesson_date, lesson_time = d[1], d[2], d[3]
         
-        db.add_lesson(student_id, lesson_date, lesson_time)
+        # Мы обращаемся к репозиторию lessons и его методу add
+        db.lessons.add(student_id, lesson_date, lesson_time, db.students)
         bot.answer_callback_query(call.id, f"✅ Записано на {lesson_time}")
 
         # Вместо handle_start попробуй просто обновить текущий экран времени, 
@@ -104,7 +104,7 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
         student_id = call.data.split("_")[2]
 
         # 1. Фиксируем урок
-        success, result = db.auto_lesson_check_in(student_id)
+        success, result = db.lessons.auto_lesson_check_in(student_id, db.students)
 
         if not success:
             bot.answer_callback_query(call.id, f"⚠️ Сейчас идет урок у: {result}", show_alert=True)
@@ -114,8 +114,8 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
         ui_refs['clear_screen'](chat_id)
     
         # 3. Достаем имя ученика для заголовка
-        student_data = db.get_student_by_id(student_id)
-        student_name = student_data[1]
+        student_data = db.students.get_by_id(student_id)
+        student_name = student_data['name'] 
 
         # 4. СОЗДАЕМ ШИРОКИЙ ЭКРАН УРОКА
         w = "⠀" # Невидимый расширитель
@@ -174,7 +174,7 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
         s_id = parts[4]
 
         # 1. Удаляем из базы
-        success = db.delete_lesson(l_date, l_time, s_id)
+        success = db.lessons.delete(l_date, l_time, s_id, db.students)
 
         if success:
             bot.answer_callback_query(call.id, "🗑️ Занятие отменено, баланс пополнен")
