@@ -38,15 +38,14 @@ def render_pay_pad(bot, chat_id, student_data, selected_date=None):
 # В файле, где у тебя лежат функции интерфейса (например, ui_helpers.py или в самом хендлере)
 
 def get_payments_list_markup(student_id, payments):
-    markup = types.InlineKeyboardMarkup()
-    for p in payments:
-        # p['payment_date'] и p['amount'] зависят от того, как возвращает БД (dict или tuple)
-        btn_text = f"❌ {p['payment_date']} — {p['amount']} PLN"
-        # Передаем ID платежа для удаления
-        markup.add(types.InlineKeyboardButton(
-            text=btn_text, 
-            callback_data=f"del_pay_{student_id}_{p['id']}"
-        ))
-    
-    markup.add(types.InlineKeyboardButton("🔙 Назад", callback_data=f"view_stu_{student_id}"))
-    return markup
+   markup = types.InlineKeyboardMarkup()
+   for p in payments:
+      # p['payment_date'] и p['amount'] зависят от того, как возвращает БД (dict или tuple)
+      btn_text = f"❌ {p['payment_date']} — {p['amount']} PLN"
+      # Передаем ID платежа для удаления
+      markup.add(types.InlineKeyboardButton(
+         text=btn_text, 
+         callback_data=f"del_pay_{student_id}_{p['id']}"
+      ))
+   
+   return markup

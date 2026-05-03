@@ -20,6 +20,9 @@ class StudentRepo(BaseDB):
             "UPDATE contacts SET balance = ?, lesson_price = ?, lesson_price_updated_at = ? WHERE id = ?",
             (balance, price, date, s_id), commit=True
         )
+    def set_new_name(self, student_id, new_name):
+        query = "UPDATE contacts SET name = ? WHERE id = ?"
+        return self.execute(query, (new_name, student_id), commit=True)
 
     def search(self, query):
         q = f"%{query}%"
@@ -43,7 +46,7 @@ class StudentRepo(BaseDB):
             WHERE id = ?
         """
         return self.execute(query, (current_actual_balance, new_price, today, student_id), commit=True)
-
+    
     def delete_student(self, s_id, finance):
         # 1. Проверка долга
         actual_balance = finance.get_actual_balance(s_id)

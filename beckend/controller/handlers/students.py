@@ -1,9 +1,32 @@
 import time
 from telebot import types
 from view.student_render import render_student_card
+import threading
 
 def register_student_handlers(bot, db, user_data, ui_refs, finance):
+    @bot.message_handler(content_types=['contact'])
+    def handle_contact(message):
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        contact = message.contact
+        
+        # Вытягиваем данные
+        phone = contact.phone_number
+        name = f"{contact.first_name} {contact.last_name or ''}".strip()
+        username = message.from_user.username or "None"
+
+        # Сохраняем в базу (используем твой метод)
+        db.students.add_contact(name, phone, None, chat_id, f"@{username}")
+        
+        # Чистый и быстрый способ оповещения:
+        msg = bot.send_message(chat_id, f"💎 <b>{name}</b> в базе", parse_mode="HTML")
     
+        # Удаляем подтверждение через 2.5 секунды в фоновом потоке
+        import threading
+        threading.Timer(2.5, lambda: bot.delete_message(chat_id, msg.message_id)).start()
+    
+        # Сразу возвращаем меню
+        ui_refs['handle_start'](message)
     # --- 1. ПЕРЕХОД ПО /id123 (Новое сообщение) ---
     @bot.message_handler(regexp=r"^/id\d+")
     def handle_id_click(message):
@@ -93,8 +116,8 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
             types.InlineKeyboardButton("🔙 Отмена", callback_data=f"edit_stu_{student_id}")
         )
         bot.edit_message_text("💰 <b>Введите новую цену (PLN):</b>", 
-                              call.message.chat.id, call.message.message_id, 
-                              reply_markup=markup, parse_mode="HTML")
+                            call.message.chat.id, call.message.message_id, 
+                            reply_markup=markup, parse_mode="HTML")
         user_data[call.from_user.id]['last_instruction_id'] = call.message.message_id
 
     # --- 5. ДОБАВЛЕНИЕ УЧЕНИКА ---
@@ -109,7 +132,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
         
         markup = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("❌ Отмена", callback_data="cancel_add"))
         bot.edit_message_text("📝 <b>Введите данные:</b>\n<code>@username Имя</code>", 
-                              call.message.chat.id, l_id, parse_mode="HTML", reply_markup=markup)
+                            call.message.chat.id, l_id, parse_mode="HTML", reply_markup=markup)
         user_data[user_id]['last_instruction_id'] = l_id
     # --- 6. ЗАПРОС ПОДТВЕРЖДЕНИЯ УДАЛЕНИЯ ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("delete_student_"))
@@ -141,7 +164,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
             parts = call.data.split("_")
             student_id = int(parts[-1])
             print(f"DEBUG: ID извлечен: {student_id}")
-    
+
             # 2. Пытаемся удалить
             print("DEBUG: Захожу в db.students.delete_student...")
             success, message = db.students.delete_student(student_id, finance)
@@ -150,7 +173,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
             if success:
                 bot.answer_callback_query(call.id, "✅ Ученик заархивирован")
                 contacts = db.students.get_all()
-                
+
                 # ВАЖНО: Если тут упадет импорт, мы поймаем это в except
                 from view.student_render import render_student_list
                 render_student_list(bot, chat_id, contacts, finance, edit_msg_id=call.message.message_id)
@@ -163,7 +186,28 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
             import traceback
             traceback.print_exc() # Выведет полную цепочку ошибки в консоль
             bot.answer_callback_query(call.id, "⚠ Произошла внутренняя ошибка", show_alert=True)
+        
+    # --- 8. РЕДАКТИРОВАНИЕ ИМЕНИ (Бесшовно) ---    
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_name_"))
+    def start_edit_name(call):
+        user_id = call.from_user.id
+        student_id = call.data.split("_")[2]
 
+        # Устанавливаем состояние ожидания
+        user_data[user_id] = {
+            'step': 'waiting_edit_name',
+            'edit_student_id': student_id
+        }
+
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text="📝 <b>Введите новое имя ученика:</b>",
+            parse_mode="HTML",
+            reply_markup=types.InlineKeyboardMarkup().add(
+                types.InlineKeyboardButton("🔙 Отмена", callback_data=f"edit_stu_{student_id}")
+            )
+        )
 # --- ВНЕШНИЕ ФУНКЦИИ ---
 
 def handle_student_text(bot, db, message, user_data, ui_refs):
@@ -205,3 +249,45 @@ def handle_price_update(bot, db, finance, message, user_id, student_id, user_dat
             user_data[user_id]['step'] = None
     except:
         bot.send_message(chat_id, "⚠ Введите число!")
+
+def handle_save_edited_name(bot, db, message, student_id, user_data, ui_refs, finance):
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    new_name = message.text.strip()
+
+    if not new_name:
+        bot.send_message(chat_id, "⚠️ Имя не может быть пустым.")
+        return
+
+    try:
+        # 1. Обновляем имя в БД
+        db.students.set_new_name(student_id, new_name)
+
+        # 2. Сбрасываем стейт (важно, чтобы бот перестал ждать имя)
+        user_data[user_id] = {}
+
+        # 3. Чистим сообщение пользователя
+        try: bot.delete_message(chat_id, message.message_id)
+        except: pass
+
+        # 4. Обновляем основную карточку студента
+        student_data = db.students.get_by_id(student_id)
+        from view.student_render import render_student_card
+        
+        render_student_card(
+            bot, 
+            chat_id, 
+            student_data, 
+            finance, 
+            is_search=True, # Чтобы была кнопка "Назад"
+            edit_msg_id=ui_refs.get('welcome_msg_id')
+        )
+        
+        # Можно отправить временное уведомление
+        temp = bot.send_message(chat_id, f"✅ Имя изменено на <b>{new_name}</b>", parse_mode="HTML")
+        threading.Timer(1, lambda: bot.delete_message(chat_id, temp.message_id)).start() # Удалим через 1 секунды
+        # Через пару секунд можно его удалить, если хочешь идеальной чистоты
+
+    except Exception as e:
+        print(f"Error updating name: {e}")
+        bot.send_message(chat_id, "❌ Не удалось изменить имя.")

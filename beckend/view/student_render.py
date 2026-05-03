@@ -49,18 +49,18 @@ def render_student_card(bot, chat_id, student_data, finance, is_edit=False, is_s
 
     markup = builder.get_markup()
     
-    if is_search or show_add_button:
-        nav_builder = AlignedMarkup(row_width=1)
-        nav_builder.add("🔙 Назад", callback_data="show_all") if is_search else nav_builder.add("➕ Добавить ученика", callback_data="add_student")
-        for row in nav_builder.get_markup().keyboard:
-            markup.keyboard.append(row)
+    # Блок навигации: теперь здесь только кнопка возврата
+    # Мы показываем её всегда, когда открыта карточка отдельного студента,
+    # чтобы юзер мог вернуться к полному списку.
+    
+    markup.add(types.InlineKeyboardButton("🔙 Назад к списку", callback_data="show_all"))
 
     caption = (f"👤 <b>Ученик:</b> {name}\n"
-               f"📱 <b>Тел:</b> <code>{phone if phone and not str(phone).startswith('id_') else 'Не указан'}</code>\n"
-               f"📅 <b>Дата:</b> {date_added}\n"
-               f"{divider}\n"
-               f"{status_emoji} <b>Статус:</b> {status_text}\n"
-               f"{width_fixer}")
+                f"📱 <b>Тел:</b> <code>{phone if phone and not str(phone).startswith('id_') else 'Не указан'}</code>\n"
+                f"📅 <b>Дата:</b> {date_added}\n"
+                f"{divider}\n"
+                f"{status_emoji} <b>Статус:</b> {status_text}\n"
+                f"{width_fixer}")
 
     # 3. ОТПРАВКА ИЛИ РЕДАКТИРОВАНИЕ
     if edit_msg_id:

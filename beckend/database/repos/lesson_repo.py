@@ -1,13 +1,24 @@
 from database.base import BaseDB
 from typing import Any, cast
 class LessonRepo(BaseDB):
-    def add(self, s_id, date, time, student_repo):
-    # ТОЛЬКО запись об уроке. 
-    # Формула сама увидит новый урок и вычтет цену при расчете.
-        return self.execute(
-            "INSERT INTO lessons (student_id, lesson_date, lesson_time, topic, duration) VALUES (?,?,?,?,?)",
-            (s_id, date, time, "Урок", 60), commit=True
-        )
+    def add(self, student_id, date, time, student_repo):
+        try:
+            # Получаем актуальную цену из таблицы contacts
+            student = student_repo.get_by_id(student_id)
+            price = student['lesson_price'] # Вот она, твоя 50 (или сколько там у ученика)
+
+            # Записываем В ТАБЛИЦУ УРОКОВ
+            query = """
+                INSERT INTO lessons (student_id, lesson_date, lesson_time, lesson_price) 
+                VALUES (?, ?, ?, ?)
+            """
+            # Если ты тут забыл передать price, то в таблицу уроков запишется 0 
+            # (потому что при ALTER TABLE ты скорее всего указал DEFAULT 0)
+            self.execute(query, (student_id, date, time, price))
+            return True
+        except Exception as e:
+            print(f"Ошибка при сохранении урока: {e}")
+            return False
 
     def delete(self, date, time, s_id, student_repo, is_refund=False):
         """
@@ -104,37 +115,35 @@ class LessonRepo(BaseDB):
     # database/repos/lesson_repo.py
 
     def auto_lesson_check_in(self, student_id, student_repo):
-        """Логика автоматической отметки урока с округлением до часа"""
         from datetime import datetime, timedelta
         now = datetime.now()
-        
-        # Логика округления: 
-        # Если 31 минута и больше — прибавляем час и зануляем минуты.
-        # Если 30 минут и меньше — просто зануляем минуты.
+    
+        # Твоя логика округления (оставляем как есть)
         if now.minute > 30:
             rounded_time = now + timedelta(hours=1)
             time_str = rounded_time.strftime("%H:00")
         else:
             time_str = now.strftime("%H:00")
-            
-        date_str = now.strftime("%Y-%m-%d")
-        
-        try:
-            # Проверяем, нет ли уже урока на этот час, чтобы не плодить дубликаты
-            existing = self.execute(
-                "SELECT id FROM lessons WHERE student_id = ? AND lesson_date = ? AND lesson_time = ?",
-                (student_id, date_str, time_str), fetchone=True
-            )
-            
-            if existing:
-                return False, f"⚠️ Урок на {time_str} уже отмечен!"
 
-            # Вызываем твой метод add
+        date_str = now.strftime("%Y-%m-%d")
+
+        try:
+            # УБИРАЕМ student_id из условия! 
+            # Проверяем занятость времени ЛЮБЫМ учеником
+            query = """
+                SELECT c.name FROM lessons l 
+                JOIN contacts c ON l.student_id = c.id 
+                WHERE l.lesson_date = ? AND l.lesson_time = ?
+            """
+            existing = self.execute(query, (date_str, time_str), fetchone=True)
+
+            if existing:
+                # Теперь мы знаем даже ИМЯ того, кто занял время
+                return False, f"{existing['name']}" # Возвращаем имя для алерта
+
+            # Если никто не найден — записываем
             success = self.add(student_id, date_str, time_str, student_repo)
-            
-            if success:
-                return True, f"✅ Урок записан на {time_str}"
-            return False, "❌ Ошибка при сохранении урока"
-            
+            return (True, time_str) if success else (False, "Ошибка сохранения")
+
         except Exception as e:
             return False, f"Ошибка: {e}"

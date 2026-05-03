@@ -28,8 +28,12 @@ class DBConfigurator:
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS lessons (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                    student_id INTEGER, lesson_date DATE, 
-                    lesson_time TEXT, topic TEXT,
+                    student_id INTEGER, 
+                    lesson_date DATE, 
+                    lesson_time TEXT, 
+                    topic TEXT, 
+                    duration INTEGER DEFAULT 60,
+                    lesson_price INTEGER DEFAULT 0,
                     FOREIGN KEY (student_id) REFERENCES contacts (id)
                 )
             ''')

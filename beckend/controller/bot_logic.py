@@ -2,7 +2,7 @@ import time
 from database.db_manager import db
 from view.student_render import render_student_card
 from controller.handlers.common import register_common_handlers
-from controller.handlers.students import register_student_handlers, handle_student_text,handle_price_update
+from controller.handlers.students import register_student_handlers, handle_student_text,handle_price_update, handle_save_edited_name
 from controller.handlers.payments import register_payment_handlers, handle_payment_text
 from controller.handlers.lessons import register_lesson_handlers
 from view.student_render import render_student_list
@@ -82,7 +82,13 @@ def register_handlers(bot, finance):
         # 3. Если ждем новую цену (Маяк)
         elif step == 'waiting_new_price':
             handle_price_update(bot, db, finance, message, user_id, state.get('edit_student_id'), user_data, ui_refs)
-        
+        # 3.5 Если ждем новое имя ученика
+        elif step == 'waiting_edit_name':
+            student_id = state.get('edit_student_id')
+            new_name = message.text.strip()
+            
+            # Вызываем функцию сохранения (напишем её ниже)
+            handle_save_edited_name(bot, db, message, student_id, user_data, ui_refs, finance)
         # 4. ПОИСК (теперь возвращает список имен)
         else:
             text_query = message.text.strip()
