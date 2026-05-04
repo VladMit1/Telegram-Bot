@@ -98,11 +98,23 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
         d = call.data.split("_")
         student_id, lesson_date, lesson_time = d[1], d[2], d[3]
         
+        # 1. Сохраняем в базу
         db.lessons.add(student_id, lesson_date, lesson_time, db.students)
         bot.answer_callback_query(call.id, f"✅ Записано на {lesson_time}")
 
-        # Обновляем этот же экран времени без удаления (мгновенно появится крестик)
-        select_lesson_day(call)
+        # 2. ПОЛУЧАЕМ ДАННЫЕ (нужны для рендера карточки)
+        student_data = db.students.get_by_id(student_id)
+
+        # 3. ВЫЗЫВАЕМ ОТРИСОВКУ КАРТОЧКИ (импортируй её в начале файла)
+        from view.student_render import render_student_card
+        
+        render_student_card(
+            bot, 
+            call.message.chat.id, 
+            student_data, 
+            finance, 
+            edit_msg_id=call.message.message_id # Редактируем текущее сообщение (сетку времени)
+        )
 
     # --- 4. УДАЛЕНИЕ УРОКА (ОТМЕНА) ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("del_les_"))
