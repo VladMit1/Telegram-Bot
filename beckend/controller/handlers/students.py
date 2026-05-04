@@ -2,17 +2,17 @@ import time
 from telebot import types
 from view.student_render import render_student_card
 import threading
-from view.student_render import render_student_list
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from database.db_manager import db # Импортируем базу
-from view.pay_render import get_payments_list_markup
 from view.calendar_view import create_calendar
 from datetime import datetime
+from helper.error_handler import safe_handler
+
 
 def register_student_handlers(bot, db, user_data, ui_refs, finance):
     @bot.message_handler(content_types=['contact'])
+    @safe_handler(bot)
     def handle_contact(message):
         chat_id = message.chat.id
         user_id = message.from_user.id
@@ -37,6 +37,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
         ui_refs['handle_start'](message)
     # --- 1. ПЕРЕХОД ПО /id123 (Новое сообщение) ---
     @bot.message_handler(regexp=r"^/id\d+")
+    @safe_handler(bot)
     def handle_id_click(message):
         chat_id = message.chat.id
         try:
@@ -72,9 +73,20 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
             bot.edit_message_text("❌ Ученик не найден", chat_id, l_id)
     # --- 2. БЫСТРЫЙ ПРОФИЛЬ / НАЗАД В ПРОФИЛЬ (Бесшовно) ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("fast_view_") or call.data.startswith("view_stu_"))
+    @safe_handler(bot) # <-- ТЕПЕРЬ ВСЁ ПОД КОНТРОЛЕМ ЭТОЙ СТРОЧКИ
     def fast_open_card(call):
         chat_id = call.message.chat.id
-        student_id = int(call.data.split("_")[2])
+    
+        # Разбираем данные
+        parts = call.data.split("_")
+        raw_id = parts[2]
+
+        # ПРОВЕРКА: Если это "all", значит это навигация общего календаря,
+        # и этот хендлер не должен его обрабатывать.
+        if raw_id == "all":
+            return 
+
+        student_id = int(raw_id)
         
         # Визуальный отклик
         ui_refs['show_loading'](chat_id, "⌛ <b>Загрузка...</b>", call=call)
@@ -88,6 +100,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
 
     # --- 3. НАСТРОЙКИ (Бесшовно) ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_stu_"))
+    @safe_handler(bot)
     def student_settings(call):
         chat_id = call.message.chat.id
         student_id = call.data.split("_")[2]
@@ -104,11 +117,16 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
             f"📱 <b>Тел:</b> <code>{student['phone'] if not str(student['phone']).startswith('id_') else '—'}</code>"
         )
         
+        # Определяем статус для кнопки
+        is_active = student.get('status') == 'active'
+        archive_btn_text = "📁 В архив" if is_active else "✅ Восстановить"
+        archive_callback = f"archive_stu_{student_id}" if is_active else f"restore_stu_{student_id}"
+
         markup = types.InlineKeyboardMarkup(row_width=2)
         markup.add(
             types.InlineKeyboardButton("🏷️ Имя", callback_data=f"edit_name_{student_id}"),
             types.InlineKeyboardButton("💰 Цена", callback_data=f"edit_price_{student_id}"),
-            types.InlineKeyboardButton("❌ Удалить", callback_data=f"delete_student_{student_id}"),
+            types.InlineKeyboardButton(archive_btn_text, callback_data=archive_callback), # Вместо удаления
             types.InlineKeyboardButton("🔙 В профиль", callback_data=f"fast_view_{student_id}")
         )
         
@@ -116,6 +134,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
 
     # --- 4. СМЕНА ЦЕНЫ ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_price_"))
+    @safe_handler(bot)
     def edit_price_init(call):
         student_id = call.data.split("_")[2]
         user_data[call.from_user.id] = {'step': 'waiting_new_price', 'edit_student_id': student_id}
@@ -130,6 +149,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
 
     # --- 5. ДОБАВЛЕНИЕ УЧЕНИКА ---
     @bot.callback_query_handler(func=lambda call: call.data == "add_student")
+    @safe_handler(bot)
     def add_student_init(call):
         user_id = call.from_user.id
         # Используем лоадинг как новое сообщение
@@ -143,60 +163,31 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
                             call.message.chat.id, l_id, parse_mode="HTML", reply_markup=markup)
         user_data[user_id]['last_instruction_id'] = l_id
     # --- 6. ЗАПРОС ПОДТВЕРЖДЕНИЯ УДАЛЕНИЯ ---
-    @bot.callback_query_handler(func=lambda call: call.data.startswith("delete_student_"))
-    def ask_delete_student(call):
-        student_id = call.data.split("_")[2]
-        student = db.students.get_by_id(student_id)
-        
-        markup = types.InlineKeyboardMarkup()
-        markup.add(
-            types.InlineKeyboardButton(text=f"✅ Да, удалить (ID: {student_id})", callback_data=f"confirm_del_{student_id}"),    
-            types.InlineKeyboardButton("🔙 Отмена", callback_data=f"edit_stu_{student_id}")
-        )
-        
-        bot.edit_message_text(
-            f"❓ <b>Удалить ученика {student['name']}?</b>\n"
-            f"Данные будут перенесены в архив.",
-            call.message.chat.id, call.message.message_id,
-            reply_markup=markup, parse_mode="HTML"
-        )
-
-    # --- 7. ФИНАЛЬНОЕ УДАЛЕНИЕ + АРХИВАЦИЯ ---
-    @bot.callback_query_handler(func=lambda call: call.data.startswith("confirm_del_"))
-    def confirm_delete_student(call):
-        print(f"!!! КНОПКА НАЖАТА !!! Data: {call.data}")
+    @bot.callback_query_handler(func=lambda call: call.data.startswith(("archive_stu_", "restore_stu_")))
+    @safe_handler(bot)
+    def handle_archive_status(call):
         chat_id = call.message.chat.id
+        data = call.data.split("_")
+        action = data[0] # archive или restore
+        student_id = data[2]
 
-        try:
-            # 1. Парсим ID
-            parts = call.data.split("_")
-            student_id = int(parts[-1])
-            print(f"DEBUG: ID извлечен: {student_id}")
-
-            # 2. Пытаемся удалить
-            print("DEBUG: Захожу в db.students.delete_student...")
-            success, message = db.students.delete_student(student_id, finance)
-            print(f"DEBUG: Результат удаления: success={success}, msg={message}")
-
-            if success:
-                bot.answer_callback_query(call.id, "✅ Ученик заархивирован")
-                contacts = db.students.get_all()
-
-                # ВАЖНО: Если тут упадет импорт, мы поймаем это в except
-                from view.student_render import render_student_list
-                render_student_list(bot, chat_id, contacts, finance, edit_msg_id=call.message.message_id)
-            else:
-                bot.answer_callback_query(call.id, f"🚫 {message}", show_alert=True)
-
-        except Exception as e:
-            # ЭТОТ БЛОК СПАСЕТ ОТ "ОШИБКИ 0" И ПОКАЖЕТ ПРАВДУ
-            print(f"❌ КРИТИЧЕСКАЯ ОШИБКА В ХЕНДЛЕРЕ: {e}")
-            import traceback
-            traceback.print_exc() # Выведет полную цепочку ошибки в консоль
-            bot.answer_callback_query(call.id, "⚠ Произошла внутренняя ошибка", show_alert=True)
+        new_status = 'inactive' if action == 'archive' else 'active'
+        
+        # ВЫЗОВ: Просто получаем результат (количество измененных строк)
+        result = db.students.set_status(student_id, new_status)
+        
+        if result: # Если изменилась хотя бы 1 строка (True)
+            alert_text = "📁 Ученик перенесен в архив" if action == 'archive' else "✅ Ученик восстановлен"
+            bot.answer_callback_query(call.id, alert_text)
+            
+            # Возвращаемся в главное меню
+            ui_refs['handle_start'](call.message)
+        else:
+            bot.answer_callback_query(call.id, "❌ Ошибка: ученик не найден")
         
     # --- 8. РЕДАКТИРОВАНИЕ ИМЕНИ (Бесшовно) ---    
     @bot.callback_query_handler(func=lambda call: call.data.startswith("edit_name_"))
+    @safe_handler(bot)
     def start_edit_name(call):
         user_id = call.from_user.id
         student_id = call.data.split("_")[2]
@@ -217,6 +208,7 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
             )
         )
     @bot.callback_query_handler(func=lambda call: call.data == "calendar_full_view")
+    @safe_handler(bot) # <-- ТЕПЕРЬ ВСЁ ПОД КОНТРОЛЕМ ЭТОЙ СТРОЧКИ
     def show_main_calendar(call):
         # Берем текущую дату
         now = datetime.now()
@@ -238,57 +230,44 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
             reply_markup=markup,
             parse_mode="HTML"
         )
+    # Ставим декоратор СРАЗУ под хендлером телеграма
     @bot.callback_query_handler(func=lambda call: call.data.startswith("all_cal_day_"))
+    @safe_handler(bot) # <-- ТЕПЕРЬ ВСЁ ПОД КОНТРОЛЕМ ЭТОЙ СТРОЧКИ
     def show_all_lessons_on_day(call):
-        try:
-            params = call.data.split("_")
-            # Индексы зависят от того, как ты формируешь callback: all_cal_day_YYYY_M_D
-            year, month, day = params[3], params[4], params[5]
-            date_str = f"{year}-{int(month):02d}-{int(day):02d}"
+        # Разбираем callback
+        params = call.data.split("_")
+        year, month, day = params[3], params[4], params[5]
+        date_str = f"{year}-{int(month):02d}-{int(day):02d}"
 
-            query = """
-                SELECT l.lesson_time, c.name 
-                FROM lessons l
-                JOIN contacts c ON l.student_id = c.id
-                WHERE date(l.lesson_date) = date(?)
-                ORDER BY l.lesson_time ASC
-            """
-            
-            # ВАЖНО: убедись, что fetchall=True реально возвращает пустой список [], а не None
-            lessons = db.execute(query, (date_str,), fetchall=True) or []
+        query = """
+            SELECT l.lesson_time, c.name 
+            FROM lessons l
+            JOIN contacts c ON l.student_id = c.id
+            WHERE date(l.lesson_date) = date(?)
+            ORDER BY l.lesson_time ASC
+        """
+    
+        # Просто пишем логику. Если тут что-то упадет — декоратор поймает!
+        lessons = db.execute(query, (date_str,), fetchall=True) or []
 
-            text = f"🗓 <b>Занятия на {day}.{month}.{year}</b>\n"
-            text += "──────────────────────────\n"
+        text = f"🗓 <b>Занятия на {day}.{month}.{year}</b>\n"
+        text += "──────────────────────────\n"
 
-            if not lessons:
-                text += "Записей не найдено. 🤷‍♂️"
-            else:
-                for res in lessons:
-                    # Твой BaseDB возвращает dict, поэтому используем ключи из SQL-запроса
-                    time_val = res.get('lesson_time', '--:--')
-                    name_val = res.get('name', 'Ученик')
-                    # Можно даже тему добавить, если она есть в запросе
-                    topic_val = res.get('topic', '')
-                    
-                    text += f"🕒 <code>{time_val}</code> — <b>{name_val}</b>\n"
-                    if topic_val:
-                        text += f"📝 <i>{topic_val}</i>\n"
-                    text += "\n" # Отступ между уроками
+        if not lessons:
+            text += "Записей не найдено."
+        else:
+            for res in lessons:
+                # Твой BaseDB возвращает dict, берем по ключам:
+                time_val = res.get('lesson_time', '--:--')
+                name_val = res.get('name', 'Ученик')
+                text += f"🕒 <code>{time_val}</code> — <b>{name_val}</b>\n"
 
-            markup = types.InlineKeyboardMarkup()
-            # Исправляем callback возврата, чтобы он совпадал с твоим навигатором
-            markup.add(types.InlineKeyboardButton("🔙 К календарю", callback_data=f"cal_nav_all_view_{year}_{month}"))
-            
-            bot.edit_message_text(
-                text, call.message.chat.id, call.message.message_id, 
-                reply_markup=markup, parse_mode="HTML"
-            )
-            
-        except Exception as e:
-            # Чтобы в консоли видеть РЕАЛЬНУЮ ошибку, а не просто "0"
-            import traceback
-            print(f"❌ Ошибка календаря детализированно:\n{traceback.format_exc()}")
-            bot.answer_callback_query(call.id, f"Ошибка: {e}")
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("🔙 К календарю", callback_data=f"cal_nav_all_view_{year}_{month}"))
+    
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, 
+                        reply_markup=markup, parse_mode="HTML")
+    
 # --- ВНЕШНИЕ ФУНКЦИИ ---
 
 def handle_student_text(bot, db, message, user_data, ui_refs):

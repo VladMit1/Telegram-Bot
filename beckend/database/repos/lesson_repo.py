@@ -133,11 +133,15 @@ class LessonRepo(BaseDB):
             return False, f"Ошибка: {e}"
     def get_all_busy_days(self, year, month):
         query = """
-            SELECT DISTINCT strftime('%d', lesson_date) 
+            SELECT DISTINCT strftime('%d', lesson_date) as day
             FROM lessons 
             WHERE strftime('%Y', lesson_date) = ? 
             AND strftime('%m', lesson_date) = ?
         """
-        # Передаем месяц с ведущим нулем (05, а не 5)
-        res = self.execute(query, (str(year), f"{month:02d}"), fetchall=True)
-        return [int(row[0]) for row in res] if res else []
+        try:
+            res = self.execute(query, (str(year), f"{month:02d}"), fetchall=True)
+            # Теперь обращаемся по ключу 'day'
+            return [int(row['day']) for row in res] if res else []
+        except Exception as e:
+            print(f"Error in get_all_busy_days: {e}")
+            return []

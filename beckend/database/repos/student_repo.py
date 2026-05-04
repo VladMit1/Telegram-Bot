@@ -7,14 +7,21 @@ class StudentRepo(BaseDB):
 
     def get_by_id(self, s_id):
         return self.execute("SELECT * FROM contacts WHERE id = ?", (s_id,), fetchone=True)
+    def set_status(self, s_id, status='active'):
+        """Переключает ученика между Архивом и Активными"""
+        return self.execute("UPDATE contacts SET status = ? WHERE id = ?", (status, s_id), commit=True)
+
+    def get_active_students(self):
+        """Список для главного экрана"""
+        return self.execute("SELECT * FROM contacts WHERE status = 'active' ORDER BY name", fetchall=True)
+
+    def get_archived_students(self):
+        """Список для раздела 'Архив'"""
+        return self.execute("SELECT * FROM contacts WHERE status = 'inactive' ORDER BY name", fetchall=True)
 
     def update_balance(self, s_id, amount):
-        # УБЕДИСЬ, что тут нет лишних прибавлений
-        return self.execute(
-            "UPDATE contacts SET balance = balance + ? WHERE id = ?", 
-            (amount, s_id), commit=True
-        )
-
+        """Универсальное изменение баланса (и для уроков, и для оплат)"""
+        return self.execute("UPDATE contacts SET balance = balance + ? WHERE id = ?", (amount, s_id), commit=True)
     def set_price(self, s_id, price, balance, date):
         return self.execute(
             "UPDATE contacts SET balance = ?, lesson_price = ?, lesson_price_updated_at = ? WHERE id = ?",

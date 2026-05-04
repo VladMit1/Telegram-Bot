@@ -33,7 +33,6 @@ def register_handlers(bot, finance):
         msg = bot.send_message(chat_id, text, parse_mode="HTML")
         return msg.message_id
 
-    ui_refs['show_loading'] = show_loading
 
     # --- УНИВЕРСАЛЬНЫЙ ОЧИСТКА ЭКРАНА ---
     def clear_screen(chat_id, keep_msg_id=None):
@@ -53,8 +52,9 @@ def register_handlers(bot, finance):
                 except: pass
         ui_refs['search_results_ids'] = new_results
 
-    ui_refs['clear_screen'] = clear_screen
 
+    ui_refs['show_loading'] = show_loading
+    ui_refs['clear_screen'] = clear_screen
     # Регистрация Callback-обработчиков
     ui_refs['handle_start'] = register_common_handlers(bot, db, finance, user_data, ui_refs)
     register_student_handlers(bot, db, user_data, ui_refs, finance)

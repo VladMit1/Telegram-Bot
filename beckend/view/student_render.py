@@ -8,9 +8,15 @@ from helper.ui_utils import save_last_msg, delete_last_msg
 from helper.button_text_align import AlignedMarkup
 
 def get_main_markup():
-    """Главное меню (одиночная кнопка)"""
+    """Главное меню (когда список активных пуст)"""
     builder = AlignedMarkup(row_width=1)
+    
+    # Теперь здесь есть всё необходимое, чтобы не тупиковать
     builder.add("➕ Добавить ученика", callback_data="add_student")
+    builder.add("📁 Перейти в архив", callback_data="show_archive")
+    builder.add("📅 Общий календарь", callback_data="calendar_full_view")
+    builder.add("📊 Финансы", callback_data="finance_view")
+    
     return builder.get_markup()
 
 def render_student_card(bot, chat_id, student_data, finance, is_edit=False, is_search=False, show_add_button=False, edit_msg_id=None):
@@ -83,29 +89,39 @@ def render_student_card(bot, chat_id, student_data, finance, is_edit=False, is_s
         print(f"Ошибка отправки карточки: {e}")
         return None
 
-def render_student_list(bot, chat_id, students, finance, edit_msg_id=None):
+def render_student_list(bot, chat_id, students, finance, edit_msg_id=None , is_archive=False):
     """Список учеников: либо редактирует, либо шлет новое. Без дублей."""
+    """Список учеников: активные или архивные."""
     markup = types.InlineKeyboardMarkup()
     
-    # Сборка текста (тут всё без изменений)
+    # 1. Формируем текст
     if not students:
-        markup.add(types.InlineKeyboardButton("➕ Добавить первого", callback_data="add_student"))
-        msg_text = "🔎 <b>База учеников пуста</b>"
+        msg_text = "🔎 <b>Архив пуст</b>" if is_archive else "🔎 <b>Активных учеников нет</b>"
     else:
+        title = "📁 <b>Архив учеников</b>" if is_archive else "📋 <b>База активных</b>"
         student_rows = []
         for i, s in enumerate(students, 1):
             s_id, s_name = s['id'], s['name']
             balance = finance.get_actual_balance(s_id)
             status_emoji, _ = finance.get_financial_status(s_id, balance)
             student_rows.append(f"{i}. {status_emoji} /id{s_id} — <b>{s_name}</b> (<code>{balance}</code>)")
+        
+        msg_text = f"{title}\n──────────────────────────\n" + "\n".join(student_rows)
 
-        markup.add( types.InlineKeyboardButton("➕ Добавить нового ученика", callback_data="add_student"),
-                    types.InlineKeyboardButton("📅 Календарь занятий", callback_data="calendar_full_view"),
-                    types.InlineKeyboardButton("📊 Финансы",callback_data="finance_view"),
-                    )
-        msg_text = (f"📋 <b>База учеников</b>\n──────────────────────────\n"
-                    f"{'\n'.join(student_rows)}\n──────────────────────────\n"
-                    f"<i>Нажмите на номер /id для просмотра профиля</i>")
+    # 2. УМНЫЕ КНОПКИ
+    if is_archive:
+        # В архиве показываем кнопку возврата к активным
+        markup.add(types.InlineKeyboardButton("🔙 К активным ученикам", callback_data="main_menu"))
+    else:
+        # В обычном списке показываем кнопку архива
+        markup.add(
+            types.InlineKeyboardButton("➕ Добавить ученика", callback_data="add_student"),
+            types.InlineKeyboardButton("📁 Перейти в архив", callback_data="show_archive")
+        )
+        markup.add(
+            types.InlineKeyboardButton("📅 Календарь", callback_data="calendar_full_view"),
+            types.InlineKeyboardButton("📊 Финансы", callback_data="finance_view")
+        )
 
     # ВАЖНЫЙ БЛОК:
     if edit_msg_id:

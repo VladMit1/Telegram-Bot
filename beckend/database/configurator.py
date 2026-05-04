@@ -14,6 +14,7 @@ class DBConfigurator:
                     phone TEXT UNIQUE, 
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     photo_id TEXT,
+                    status TEXT DEFAULT 'active',
                     chat_id INTEGER,
                     last_book TEXT DEFAULT 'Не выбрана',
                     last_page INTEGER DEFAULT 0,
@@ -46,17 +47,6 @@ class DBConfigurator:
                     FOREIGN KEY (student_id) REFERENCES contacts (id)
                 )
             ''')
-            #Удаленные контакты (для истории)
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS deleted_students (
-                    id INTEGER PRIMARY KEY,
-                    name TEXT,
-                    phone TEXT,
-                    total_paid INTEGER,
-                    total_lessons INTEGER,
-                    period_start TEXT,
-                    period_end TEXT
-                )
-            ''')
+            
             conn.commit()
             print("🏗️ Структура БД проверена и готова")

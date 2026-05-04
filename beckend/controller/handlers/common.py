@@ -16,7 +16,7 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
         # Полная очистка экрана (удалит все старые сообщения бота)
         ui_refs['clear_screen'](chat_id)
         
-        contacts = db.students.get_all()
+        contacts = db.students.get_active_students()
         
         if not contacts:
             msg = bot.send_message(chat_id, "👋 <b>База пуста. Добавьте первого ученика:</b>", 
@@ -37,15 +37,15 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
         if user_id in user_data:
             user_data[user_id]['step'] = None
     
-        contacts = db.students.get_all()
+        contacts = db.students.get_active_students()
     
         if not contacts:
             try:
                 bot.edit_message_text(
-                    text="👋 <b>База пуста. Добавьте первого ученика:</b>", 
+                    text="👋 <b>Нет активных учеников</b>", # Можешь поменять текст и тут
                     chat_id=chat_id, 
                     message_id=call.message.message_id, 
-                    reply_markup=get_main_markup(), 
+                    reply_markup=get_main_markup(), # ТУТ ОН ПОДТЯНЕТ НОВЫЕ КНОПКИ
                     parse_mode="HTML"
                 )
                 ui_refs['welcome_msg_id'] = call.message.message_id
@@ -106,3 +106,16 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
         except Exception as e:
             print(f"Navigation error: {e}")
             pass
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "show_archive")
+    def handle_show_archive(call):
+        # Берем только неактивных
+        archived = db.students.get_archived_students()
+    
+        if not archived:
+            bot.answer_callback_query(call.id, "Архив пуст")
+            return
+
+        # Можно использовать тот же render_student_list
+        render_student_list(bot, call.message.chat.id, archived, finance, edit_msg_id=call.message.message_id, is_archive=True)
+    return handle_start
