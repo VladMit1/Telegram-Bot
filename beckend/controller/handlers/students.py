@@ -41,36 +41,34 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
     def handle_id_click(message):
         chat_id = message.chat.id
         try:
-            # Чистим сообщение пользователя сразу, чтобы не висело
+            # Сразу удаляем команду пользователя
             bot.delete_message(chat_id, message.message_id)
             student_id = int(message.text.replace("/id", ""))
         except: return
 
-        # 1. Показываем лоадинг
-        l_id = ui_refs['show_loading'](chat_id, "⌛ <b>Загрузка профиля...</b>")
-        
-        # 2. Получаем данные
         student_data = db.students.get_by_id(student_id)
-        
-        if student_data:
-            # 3. Чистим экран, КРОМЕ нашего лоадинга
-            ui_refs['clear_screen'](chat_id, keep_msg_id=l_id)
-            
-            # 4. Рендерим карточку СТРОГО через редактирование лоадинга
-            # Убедись, что в render_student_card в конце стоит return!
-            render_student_card(
-                bot, 
+        if not student_data:
+            bot.send_message(chat_id, "❌ Ученик не найден")
+            return
+
+        # Берем ID главного сообщения (списка)
+        m_id = ui_refs.get('welcome_msg_id')
+
+        try:
+            # Пытаемся отредактировать список в лоадинг
+            bot.edit_message_text(
+                "⌛ <b>Загрузка профиля...</b>", 
                 chat_id, 
-                student_data, 
-                finance, 
-                is_search=True, 
-                edit_msg_id=l_id  # <--- Подменяем текст лоадинга на карточку
+                m_id, 
+                parse_mode="HTML"
             )
-            
-            # Обновляем "главное" сообщение бота
-            ui_refs['welcome_msg_id'] = l_id 
-        else:
-            bot.edit_message_text("❌ Ученик не найден", chat_id, l_id)
+            # Если редактирование прошло успешно, рендерим карточку в это же сообщение
+            render_student_card(bot, chat_id, student_data, finance, is_search=True, edit_msg_id=m_id)
+        except Exception as e:
+            # Если сообщение m_id не найдено (ошибка 400), шлем НОВОЕ
+            print(f"Edit failed, sending new: {e}")
+            new_m_id = render_student_card(bot, chat_id, student_data, finance, is_search=True)
+            ui_refs['welcome_msg_id'] = new_m_id
     # --- 2. БЫСТРЫЙ ПРОФИЛЬ / НАЗАД В ПРОФИЛЬ (Бесшовно) ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("fast_view_") or call.data.startswith("view_stu_"))
     @safe_handler(bot) # <-- ТЕПЕРЬ ВСЁ ПОД КОНТРОЛЕМ ЭТОЙ СТРОЧКИ

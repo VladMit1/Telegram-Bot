@@ -70,3 +70,70 @@ class FinanceManager:
             return "🟢", f"Оплачено ({balance} PLN)"
         else:
             return "✅", f"Баланс: {balance} PLN"
+        
+    def get_student_history_by_months(self, student_id):
+        """Детальная история ученика: Месяц | Оплачено | Отработано"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            # Этот запрос объединяет оплаты и уроки, группируя их по месяцам
+            query = """
+                SELECT 
+                    strftime('%m.%Y', date_val) as month_year,
+                    SUM(p_amount) as total_paid,
+                    SUM(l_price) as total_spent
+                FROM (
+                    SELECT payment_date as date_val, amount as p_amount, 0 as l_price 
+                    FROM payments WHERE student_id = ?
+                    UNION ALL
+                    SELECT lesson_date as date_val, 0 as p_amount, lesson_price as l_price 
+                    FROM lessons WHERE student_id = ?
+                )
+                GROUP BY month_year
+                ORDER BY date_val DESC
+                LIMIT 12
+            """
+            cursor.execute(query, (student_id, student_id))
+            return cursor.fetchall()
+
+    def get_total_yearly_stats(self):
+        """Общая касса по годам (для главного меню)"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT strftime('%Y', payment_date) as year, SUM(amount)
+                FROM payments
+                GROUP BY year
+                ORDER BY year DESC
+            """)
+            return cursor.fetchall()  
+
+    def get_global_report(self):
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+        
+            # 1. Сколько всего реально зашло денег (Все пополнения)
+            cursor.execute("SELECT COALESCE(SUM(amount), 0) FROM payments")
+            total_income = cursor.fetchone()[0]
+        
+            # 2. Сколько уроков уже проведено в деньгах
+            cursor.execute("SELECT COALESCE(SUM(lesson_price), 0) FROM lessons")
+            total_spent = cursor.fetchone()[0]
+        
+            # 3. Текущая дебиторка (суммарный долг учеников)
+            # Считаем разницу для каждого и суммируем только тех, у кого минус
+            cursor.execute("""
+                SELECT SUM(diff) FROM (
+                    SELECT (COALESCE(p.s_paid, 0) - COALESCE(l.s_spent, 0)) as diff
+                    FROM contacts c
+                    LEFT JOIN (SELECT student_id, SUM(amount) as s_paid FROM payments GROUP BY student_id) p ON c.id = p.student_id
+                    LEFT JOIN (SELECT student_id, SUM(lesson_price) as s_spent FROM lessons GROUP BY student_id) l ON c.id = l.student_id
+                ) WHERE diff < 0
+            """)
+        total_debt = cursor.fetchone()[0] or 0
+
+        return {
+                'total_income': total_income,
+                'total_spent': total_spent,
+                'balance_in_system': total_income - total_spent, # Твой "аванс" от учеников
+                'total_debt': abs(total_debt)
+            }

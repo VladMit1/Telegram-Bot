@@ -19,7 +19,7 @@ def get_main_markup():
     
     return builder.get_markup()
 
-def render_student_card(bot, chat_id, student_data, finance, is_edit=False, is_search=False, show_add_button=False, edit_msg_id=None):
+def render_student_card(bot, chat_id, student_data, finance, is_edit=False, is_search=False, edit_msg_id=None):
     """Карточка ученика (Полностью текстовый режим для плавности)"""
     
     # 1. Извлечение данных
@@ -50,7 +50,7 @@ def render_student_card(bot, chat_id, student_data, finance, is_edit=False, is_s
     builder.add("🎥 Урок", callback_data=f"start_lesson_{s_id}")
     builder.add("💳 Пополнить", callback_data=f"pay_{s_id}")
     builder.add("📋 Платежи", callback_data=f"history_pay_{s_id}")
-    builder.add("📊 Отчет", web_app=types.WebAppInfo(url=f"https://vladmit1.github.io/Telegram-Bot/?studentId={s_id}"))
+    builder.add("📊 Отчет", callback_data=f"report_{s_id}")
     builder.add("⚙️ Опции", callback_data=f"edit_stu_{s_id}")
 
     markup = builder.get_markup()

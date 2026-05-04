@@ -153,7 +153,8 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
         
         markup = types.InlineKeyboardMarkup()
         # Важно: кнопка "fast_view" уже умеет редактировать сообщение обратно в профиль
-        markup.add(types.InlineKeyboardButton("🔙 В профиль", callback_data=f"fast_view_{student_id}"))
+        markup.add(types.InlineKeyboardButton("🔙 В профиль", callback_data=f"fast_view_{student_id}"),
+                types.InlineKeyboardButton("🔗 Meet", url="https://meet.google.com/new"))
 
         bot.edit_message_text(
             chat_id=chat_id,

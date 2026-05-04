@@ -43,7 +43,9 @@ class DBConfigurator:
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS payments (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                    student_id INTEGER, amount INTEGER, payment_date DATE,
+                    student_id INTEGER,
+                    amount INTEGER, 
+                    payment_date DATE,
                     FOREIGN KEY (student_id) REFERENCES contacts (id)
                 )
             ''')

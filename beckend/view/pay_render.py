@@ -26,7 +26,7 @@ def render_pay_pad(bot, chat_id, student_data, selected_date=None):
    markup.add(
       types.InlineKeyboardButton(f"✅ Выбрать {selected_date}", callback_data=f"set_pay_date_{student_id}_{selected_date}")
    )
-   markup.add(types.InlineKeyboardButton("❌ Отмена", callback_data=f"back_to_card_{student_id}"))
+   markup.add(types.InlineKeyboardButton("❌ Отмена", callback_data=f"fast_view_{student_id}"))
 
    caption = (f"💳 <b>Пополнение баланса</b>\n"
                f"👤 <b>Ученик:</b> {name}\n"
