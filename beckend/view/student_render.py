@@ -89,52 +89,52 @@ def render_student_card(bot, chat_id, student_data, finance, is_edit=False, is_s
         print(f"Ошибка отправки карточки: {e}")
         return None
 
-def render_student_list(bot, chat_id, students, finance, edit_msg_id=None , is_archive=False):
-    """Список учеников: либо редактирует, либо шлет новое. Без дублей."""
-    """Список учеников: активные или архивные."""
+def render_student_list(bot, chat_id, students, finance, edit_msg_id=None, is_archive=False):
     markup = types.InlineKeyboardMarkup()
     
-    # 1. Формируем текст
+    # 1. ФОРМИРУЕМ ТЕКСТ
     if not students:
         msg_text = "🔎 <b>Архив пуст</b>" if is_archive else "🔎 <b>Активных учеников нет</b>"
     else:
-        title = "📁 <b>Архив учеников</b>" if is_archive else "📋 <b>База активных</b>"
+        title = "📁 <b>АРХИВ УЧЕНИКОВ</b>" if is_archive else "📋 <b>БАЗА АКТИВНЫХ</b>"
         student_rows = []
+        
         for i, s in enumerate(students, 1):
             s_id, s_name = s['id'], s['name']
             balance = finance.get_actual_balance(s_id)
             status_emoji, _ = finance.get_financial_status(s_id, balance)
-            student_rows.append(f"{i}. {status_emoji} /id{s_id} — <b>{s_name}</b> (<code>{balance}</code>)")
+            
+            # Возвращаем Имя (Баланс) и делаем ID кликабельным
+            # При нажатии на /view_{s_id} бот откроет карточку
+            row = f"{i}. {status_emoji} —|/id{s_id}|—<b>{s_name}</b> (<code>{balance}</code>) "
+            student_rows.append(row)
         
-        msg_text = f"{title}\n──────────────────────────\n" + "\n".join(student_rows)
+        # Красивый разделитель, который чуть шире текста
+        header = f"{title}\n" + "─" * 25 + "\n"
+        msg_text = header + "\n".join(student_rows)
 
-    # 2. УМНЫЕ КНОПКИ
+    # 2. КНОПКИ (делаем их компактными, чтобы текст доминировал)
     if is_archive:
-        # В архиве показываем кнопку возврата к активным
-        markup.add(types.InlineKeyboardButton("🔙 К активным ученикам", callback_data="main_menu"))
+        markup.add(types.InlineKeyboardButton("🔙 Назад к активным", callback_data="main_menu"))
     else:
-        # В обычном списке показываем кнопку архива
-        markup.add(
-            types.InlineKeyboardButton("➕ Добавить ученика", callback_data="add_student"),
-            types.InlineKeyboardButton("📁 Перейти в архив", callback_data="show_archive")
+        # Важные действия в один ряд, чтобы не растягивать блок кнопок
+        markup.row(
+            types.InlineKeyboardButton("➕ Добавить", callback_data="add_student"),
+            types.InlineKeyboardButton("📁 Архив", callback_data="show_archive")
         )
-        markup.add(
+        markup.row(
             types.InlineKeyboardButton("📅 Календарь", callback_data="calendar_full_view"),
             types.InlineKeyboardButton("📊 Финансы", callback_data="finance_view")
         )
 
-    # ВАЖНЫЙ БЛОК:
+    # 3. ОТПРАВКА / РЕДАКТИРОВАНИЕ
     if edit_msg_id:
         try:
             bot.edit_message_text(msg_text, chat_id, edit_msg_id, reply_markup=markup, parse_mode="HTML")
-            return edit_msg_id  # <--- КРИТИЧНО: выходим из функции здесь!
-        except Exception as e:
-            print(f"Edit failed: {e}") 
-            # Если не смогли отредактировать (например, текст совпадает), 
-            # просто выходим, чтобы не плодить сообщения
+            return edit_msg_id
+        except Exception:
             return edit_msg_id
 
-    # Сюда код дойдет ТОЛЬКО если edit_msg_id равен None
     delete_last_msg(bot, chat_id)
     sent_msg = bot.send_message(chat_id, msg_text, parse_mode="HTML", reply_markup=markup)
     save_last_msg(chat_id, sent_msg.message_id)

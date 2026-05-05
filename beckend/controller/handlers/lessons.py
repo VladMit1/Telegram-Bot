@@ -4,30 +4,39 @@ from view.calendar_view import create_calendar
 
 def register_lesson_handlers(bot, db, ui_refs, finance):
 
-    # --- 1. ОТКРЫТИЕ КАЛЕНДАРЯ (С ЛОАДИНГОМ) ---
+    # --- 1. ОТКРЫТИЕ КАЛЕНДАРЯ (ЧИСТАЯ ТРАНСФОРМАЦИЯ) ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("open_calendar_"))
     def lessons_cal(call):
         student_id = call.data.split("_")[2]
+        chat_id = call.message.chat.id
+        message_id = call.message.message_id
         
-        # Используем лоадинг (создаем новое сообщение, так как старое удалим)
-        l_id = ui_refs['show_loading'](call.message.chat.id, "📅 <b>Загрузка календаря...</b>")
+        # 1. Мгновенный визуальный отклик (песочные часы в кнопке)
+        bot.answer_callback_query(call.id, "📅 Открываю календарь...")
         
-        ui_refs['clear_screen'](call.message.chat.id, keep_msg_id=l_id)
+        # 2. Вместо удаления — превращаем текущее сообщение в лоадинг (опционально)
+        # Но лучше сразу генерировать календарь, если база быстрая.
+        # Если хочешь "мерцание" лоадинга, раскомментируй строку ниже:
+        # bot.edit_message_text("📅 <b>Загрузка календаря...</b>", chat_id, message_id, parse_mode="HTML")
         
-        try: bot.delete_message(call.message.chat.id, call.message.message_id)
-        except: pass
-        
-        markup = create_calendar(student_id)
-        
-        # Редактируем заглушку лоадинга на сам календарь
-        bot.edit_message_text(
-            "📅 <b>Выберите дату занятия:</b>",
-            chat_id=call.message.chat.id,
-            message_id=l_id,
-            reply_markup=markup,
-            parse_mode="HTML"
-        )
-        ui_refs['welcome_msg_id'] = l_id
+        try:
+            markup = create_calendar(student_id)
+            
+            # 3. Редактируем сообщение: Профиль -> Календарь
+            bot.edit_message_text(
+                text="📅 <b>Выберите дату занятия:</b>",
+                chat_id=chat_id,
+                message_id=message_id,
+                reply_markup=markup,
+                parse_mode="HTML"
+            )
+            
+            # Обновляем ID главного сообщения, чтобы не терять его
+            ui_refs['welcome_msg_id'] = message_id
+            
+        except Exception as e:
+            print(f"❌ Ошибка при открытии календаря: {e}")
+            bot.answer_callback_query(call.id, "⚠️ Ошибка при загрузке календаря", show_alert=True)
 
     # --- 2. ВЫБОР ДНЯ (СЕТКА ВРЕМЕНИ) ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("cal_day_"))
