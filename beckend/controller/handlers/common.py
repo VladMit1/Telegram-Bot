@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Импорты вьюх и хелперов
 from view.student_render import render_student_list, get_main_markup
-from view.calendar_view import create_calendar
+from view.calendar_view import create_calendar, create_months_select, create_years_select
 from helper.error_handler import safe_handler
 from helper.ui_utils import save_last_msg, delete_last_msg # Добавил, если они используются
 
@@ -94,7 +94,7 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
         if mode == "pay" and student_id != "all":
             highlight_dates = db.payments.get_dates_by_student(student_id)
 
-        markup = create_calendar(student_id, year, month, mode, highlight_dates)
+        markup = create_calendar(student_id, year, month, mode, highlight_dates, db)
 
         try:
             bot.edit_message_text(text, call.message.chat.id, call.message.message_id, 
@@ -144,7 +144,7 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
         markup.add(types.InlineKeyboardButton("🔙 Назад", callback_data="main_menu"))
 
         bot.edit_message_text(report_text, call.message.chat.id, call.message.message_id, 
-                              reply_markup=markup, parse_mode="HTML")
+                            reply_markup=markup, parse_mode="HTML")
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("report_"))
     @safe_handler(bot)
@@ -198,6 +198,40 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
         markup.add(types.InlineKeyboardButton("🔙 Назад", callback_data=back_callback))
         bot.edit_message_text(text, chat_id, call.message.message_id, reply_markup=markup, parse_mode="HTML")
     
-    
+    # --- 1. РЕНДЕР СЕТКИ МЕСЯЦЕВ ---
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("open_months_"))
+    def handle_open_months(call):
+        # Разбираем callback: open_months_{student_id}_{mode}_{year}
+        parts = call.data.split("_")
+        s_id, mode, year = parts[2], parts[3], parts[4]
+        
+        # Импортируем функцию из файла, где лежит наш календарь
+        
+        markup = create_months_select(s_id, mode, year)
+        
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text="🗓 <b>Выберите месяц:</b>",
+            reply_markup=markup,
+            parse_mode="HTML"
+        )
+
+    # --- 2. РЕНДЕР СЕТКИ ГОДОВ ---
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("open_years_"))
+    def handle_open_years(call):
+        # Разбираем callback: open_years_{student_id}_{mode}_{current_year}
+        parts = call.data.split("_")
+        s_id, mode, year = parts[2], parts[3], parts[4]
+        
+        markup = create_years_select(s_id, mode, year)
+        
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text="📅 <b>Выберите год:</b>",
+            reply_markup=markup,
+            parse_mode="HTML"
+        )
 
     return handle_start
