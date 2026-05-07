@@ -218,7 +218,8 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
             student_id="all", 
             year=now.year, 
             month=now.month, 
-            mode="view"
+            mode="view",
+            db=db
         )
 
         bot.edit_message_text(

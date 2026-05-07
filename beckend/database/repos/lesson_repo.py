@@ -102,7 +102,7 @@ class LessonRepo(BaseDB):
         from datetime import datetime, timedelta
         now = datetime.now()
     
-        # Твоя логика округления (оставляем как есть)
+        # Округление времени (твоя логика)
         if now.minute > 30:
             rounded_time = now + timedelta(hours=1)
             time_str = rounded_time.strftime("%H:00")
@@ -112,22 +112,29 @@ class LessonRepo(BaseDB):
         date_str = now.strftime("%Y-%m-%d")
 
         try:
-            # УБИРАЕМ student_id из условия! 
-            # Проверяем занятость времени ЛЮБЫМ учеником
-            query = """
+            # 1. ПРОВЕРКА: А не занято ли конкретно это время кем-то другим?
+            query_time = """
                 SELECT c.name FROM lessons l 
                 JOIN contacts c ON l.student_id = c.id 
                 WHERE l.lesson_date = ? AND l.lesson_time = ?
             """
-            existing = self.execute(query, (date_str, time_str), fetchone=True)
+            existing_time = self.execute(query_time, (date_str, time_str), fetchone=True)
+            if existing_time:
+                return False, f"занято: {existing_time['name']}"
 
-            if existing:
-                # Теперь мы знаем даже ИМЯ того, кто занял время
-                return False, f"{existing['name']}" # Возвращаем имя для алерта
+            # 2. ПРОВЕРКА: А не проводил ли ЭТОТ ученик уже урок сегодня?
+            query_student = """
+                SELECT lesson_time FROM lessons 
+                WHERE student_id = ? AND lesson_date = ?
+            """
+            already_had_lesson = self.execute(query_student, (student_id, date_str), fetchone=True)
+            if already_had_lesson:
+                # Возвращаем False и время, когда был урок, чтобы вывести в варн
+                return False, f"уже был урок в {already_had_lesson['lesson_time']}"
 
-            # Если никто не найден — записываем
+            # Если всё чисто — записываем
             success = self.add(student_id, date_str, time_str, student_repo)
-            return (True, time_str) if success else (False, "Ошибка сохранения")
+            return (True, time_str) if success else (False, "Ошибка базы")
 
         except Exception as e:
             return False, f"Ошибка: {e}"

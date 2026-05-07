@@ -85,7 +85,7 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
         mode = params[3]
         year, month = int(params[4]), int(params[5])
 
-        highlight_dates = None
+        highlight_dates = []
         if student_id == "all":
             text = "📅 <b>Общий календарь загрузки:</b>"
         else:

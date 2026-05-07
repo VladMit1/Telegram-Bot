@@ -1,11 +1,12 @@
 import time
 from telebot import types
 from view.calendar_view import create_calendar
-
+from helper.error_handler import safe_handler
 def register_lesson_handlers(bot, db, ui_refs, finance):
 
     # --- 1. ОТКРЫТИЕ КАЛЕНДАРЯ (ЧИСТАЯ ТРАНСФОРМАЦИЯ) ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("open_calendar_"))
+    @safe_handler(bot)
     def lessons_cal(call):
         student_id = call.data.split("_")[2]
         chat_id = call.message.chat.id
@@ -20,7 +21,11 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
         # bot.edit_message_text("📅 <b>Загрузка календаря...</b>", chat_id, message_id, parse_mode="HTML")
         
         try:
-            markup = create_calendar(student_id)
+            # --- ВОТ ТУТ ДОБАВИЛИ ПОЛУЧЕНИЕ ОПЛАТ ---
+            highlight_dates = db.payments.get_dates_by_student(student_id)
+        
+        # --- И ПЕРЕДАЕМ db=db ВМЕСТЕ С ОПЛАТАМИ ---
+            markup = create_calendar(student_id, db=db, highlight_dates=highlight_dates)
             
             # 3. Редактируем сообщение: Профиль -> Календарь
             bot.edit_message_text(
@@ -28,7 +33,7 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
                 chat_id=chat_id,
                 message_id=message_id,
                 reply_markup=markup,
-                parse_mode="HTML"
+                parse_mode="HTML",
             )
             
             # Обновляем ID главного сообщения, чтобы не терять его
@@ -40,6 +45,7 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
 
     # --- 2. ВЫБОР ДНЯ (СЕТКА ВРЕМЕНИ) ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("cal_day_"))
+    @safe_handler(bot)
     def select_lesson_day(call):
         d = call.data.split("_")
         if len(d) < 6: return
@@ -103,6 +109,7 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
 
     # --- 3. ЗАПИСЬ НА УРОК ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("stme_"))
+    @safe_handler(bot)
     def save_lesson(call):
         d = call.data.split("_")
         student_id, lesson_date, lesson_time = d[1], d[2], d[3]
@@ -127,6 +134,7 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
 
     # --- 4. УДАЛЕНИЕ УРОКА (ОТМЕНА) ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("del_les_"))
+    @safe_handler(bot)
     def handle_delete_lesson(call):
         parts = call.data.split("_")
         # Извлекаем параметры из callback_data
@@ -148,45 +156,65 @@ def register_lesson_handlers(bot, db, ui_refs, finance):
         call.data = f"cal_day_{s_id}_{date_parts[0]}_{date_parts[1]}_{date_parts[2]}"
         select_lesson_day(call)
 
-    # --- 5. БЫСТРЫЙ СТАРТ УРОКА (CHECK-IN) ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("start_lesson_"))
+    @safe_handler(bot)
     def start_lesson_callback(call):
         chat_id = call.message.chat.id
         student_id = call.data.split("_")[2]
-
-        # 1. Вместо создания НОВОГО сообщения, редактируем текущую карточку в лоадинг
-        # Это мгновенно дает отклик без "прыжка" экрана
+        student_name = db.students.get_by_id(student_id)['name']
         ui_refs['show_loading'](chat_id, "⌛ <b>Фиксирую урок...</b>", call=call)
 
         success, result = db.lessons.auto_lesson_check_in(student_id, db.students)
+        student_data = db.students.get_by_id(student_id)
 
         if not success:
-            # Если ошибка (урок у другого), возвращаем карточку студента назад
-            bot.answer_callback_query(call.id, f"⚠️ Сейчас идет урок у: {result}", show_alert=True)
-            # Просто вызываем отрисовку карточки обратно в этом же сообщении
+            # result теперь содержит либо имя того кто занял, либо инфу о повторе
+            if "уже был урок" in result:
+                msg = f"⚠️ У {student_name} {result}!"
+            else:
+                msg = f"⚠️ Сейчас идет урок у: {result}"
+                
+            bot.answer_callback_query(call.id, msg, show_alert=True)
+            
+            # Возвращаем карточку
             from view.student_render import render_student_card
-            student_data = db.students.get_by_id(student_id)
             render_student_card(bot, chat_id, student_data, finance, edit_msg_id=call.message.message_id)
-            return 
+            return
 
-        # 2. Если успех — редактируем ТЕКУЩЕЕ сообщение в подтверждение
-        student_data = db.students.get_by_id(student_id)
+        # --- ЛОГИКА ФОРМИРОВАНИЯ ССЫЛКИ (как в твоем рендере) ---
+        phone = student_data.get('phone')
+        username = student_data.get('username')
         
-        markup = types.InlineKeyboardMarkup()
-        # Важно: кнопка "fast_view" уже умеет редактировать сообщение обратно в профиль
-        markup.add(types.InlineKeyboardButton("🔙 В профиль", callback_data=f"fast_view_{student_id}"),
-                types.InlineKeyboardButton("🔗 Meet", url="https://meet.google.com/new"))
+        # Определяем цель (приоритет телефону, если он не системный ID)
+        target = phone if phone and not str(phone).startswith('id_') else (username if username and username != "None" else None)
+        
+        # Формируем URL чата
+        chat_url = f"https://t.me/{str(target).replace('@', '').strip()}" if target else None
+
+        # Формируем клавиатуру
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        
+        # Первый ряд: Meet и Написать
+        btn_meet = types.InlineKeyboardButton("🔗 Meet", url="https://meet.google.com/new")
+        if chat_url:
+            btn_chat = types.InlineKeyboardButton("💬 Написать", url=chat_url)
+        else:
+            btn_chat = types.InlineKeyboardButton("💬 ———", callback_data="none")
+            
+        markup.row(btn_meet, btn_chat)
+        
+        # Второй ряд: возврат
+        markup.row(types.InlineKeyboardButton("🔙 В профиль", callback_data=f"fast_view_{student_id}"))
 
         bot.edit_message_text(
             chat_id=chat_id,
             message_id=call.message.message_id,
             text=f"✅ <b>Урок зафиксирован!</b>\n──────────────────────────\n"
                 f"👤 Ученик: <b>{student_data['name']}</b>\n"
-                f"⏰ Время: <b>{result}</b>",
+                f"⏰ Время: <b>{result}</b>\n\n"
+                f"<i>Урок списан. Ссылки на Meet и чат подготовлены.</i>",
             parse_mode="HTML", 
             reply_markup=markup
         )
         
-        # Обновляем "якорь", чтобы бот знал, что это всё еще наше главное окно
         ui_refs['welcome_msg_id'] = call.message.message_id
-    
