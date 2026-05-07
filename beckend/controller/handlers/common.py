@@ -56,27 +56,23 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
         contacts = db.students.get_active_students()
     
         if not contacts:
-            try:
-                bot.edit_message_text(
-                    text="👋 <b>Нет активных учеников</b>", 
-                    chat_id=chat_id, 
-                    message_id=call.message.message_id, 
-                    reply_markup=get_main_markup(), 
-                    parse_mode="HTML"
-                )
-            except:
-                msg = bot.send_message(chat_id, "👋 <b>База пуста:</b>", reply_markup=get_main_markup(), parse_mode="HTML")
-                ui_refs['welcome_msg_id'] = msg.message_id
+            # Если пусто — трансформируем в "Пусто"
+            bot.edit_message_text(
+                text="👋 <b>Нет активных учеников</b>", 
+                chat_id=chat_id, 
+                message_id=call.message.message_id, 
+                reply_markup=get_main_markup(), 
+                parse_mode="HTML"
+            )
         else:
+            # ТРАНСФОРМАЦИЯ: Превращаем форму ввода обратно в список учеников
             render_student_list(
                 bot, 
                 chat_id, 
                 contacts, 
                 finance, 
-                edit_msg_id=call.message.message_id
+                edit_msg_id=call.message.message_id # Передаем ID сообщения для редактирования
             )
-            ui_refs['search_results_ids'] = []
-
     @bot.callback_query_handler(func=lambda call: call.data.startswith("cal_nav_"))
     @safe_handler(bot)
     def handle_calendar_navigation(call):

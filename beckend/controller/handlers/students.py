@@ -150,16 +150,26 @@ def register_student_handlers(bot, db, user_data, ui_refs, finance):
     @safe_handler(bot)
     def add_student_init(call):
         user_id = call.from_user.id
-        # Используем лоадинг как новое сообщение
-        l_id = ui_refs['show_loading'](call.message.chat.id, "⌛ <b>Подготовка...</b>")
+        chat_id = call.message.chat.id
         
-        user_data[user_id] = {'step': 'waiting_name'}
-        ui_refs['clear_screen'](call.message.chat.id, keep_msg_id=l_id)
+        # Стейт
+        user_data[user_id] = {
+            'step': 'waiting_name',
+            'last_instruction_id': call.message.message_id # Запоминаем ID текущего окна
+        }
         
-        markup = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton("❌ Отмена", callback_data="cancel_add"))
-        bot.edit_message_text("📝 <b>Введите данные:</b>\n<code>@username Имя</code>", 
-                            call.message.chat.id, l_id, parse_mode="HTML", reply_markup=markup)
-        user_data[user_id]['last_instruction_id'] = l_id
+        # ТРАНСФОРМАЦИЯ: Редактируем список в форму ввода
+        markup = types.InlineKeyboardMarkup().add(
+            types.InlineKeyboardButton("❌ Отмена", callback_data="cancel_add")
+        )
+        
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=call.message.message_id,
+            text="📝 <b>Введите данные:</b>\n<code>@username Имя</code>", 
+            parse_mode="HTML", 
+            reply_markup=markup
+        )
     # --- 6. ЗАПРОС ПОДТВЕРЖДЕНИЯ УДАЛЕНИЯ ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith(("archive_stu_", "restore_stu_")))
     @safe_handler(bot)

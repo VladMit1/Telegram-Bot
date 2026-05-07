@@ -103,10 +103,15 @@ def render_student_list(bot, chat_id, students, finance, edit_msg_id=None, is_ar
             s_id, s_name = s['id'], s['name']
             balance = finance.get_actual_balance(s_id)
             status_emoji, _ = finance.get_financial_status(s_id, balance)
+            bal_val = str(balance).rjust(5)
+            balance_part = f"<code>{bal_val}</code>"
+            # Собираем строку в стиле "Ветка" с отступом (маргином)
+            # \n в конце строки создаст тот самый вертикальный разрыв между учениками
+            row = (
+                f"{status_emoji} <b>{s_name}</b>\n"
+                f"└─ 👉 /id{s_id}  |  💰 <code>{balance_part} PLN</code>\n"
+            )
             
-            # Возвращаем Имя (Баланс) и делаем ID кликабельным
-            # При нажатии на /view_{s_id} бот откроет карточку
-            row = f"{i}. {status_emoji} —|/id{s_id}|—<b>{s_name}</b> (<code>{balance}</code>) "
             student_rows.append(row)
         
         # Красивый разделитель, который чуть шире текста
