@@ -152,24 +152,79 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
         if student_id:
             # --- ОТЧЕТ ПО УЧЕНИКУ ---
             student = db.students.get_by_id(student_id)
-            balance = finance.get_actual_balance(student_id)
-            history = finance.get_student_history_by_months(student_id)
-        
-            history_text = ""
-            for row in history:
-                month, paid, spent = row
-                # Формируем строку: "05.2024: 📥500 / 📤450"
-                history_text += f"📅 <b>{month}:</b> 📥<code>{paid}</code> / 📤<code>{spent}</code>\n"
+            if not student:
+                bot.answer_callback_query(call.id, "Ученик не найден", show_alert=True)
+                return
 
-            text = (
-                f"👤 <b>Финансы: {student['name']}</b>\n"
-                f"──────────────────────────\n"
-                f"💰 <b>Текущий баланс:</b> <code>{balance} PLN</code>\n\n"
-                f"📊 <b>История (Месяц: Оплата/Уроки):</b>\n"
-                f"{history_text if history_text else '<i>Данных пока нет</i>'}\n"
-                f"──────────────────────────"
-            )
+            # Готовый вариант возврата
             back_callback = f"fast_view_{student_id}"
+
+            # 1. Получаем доступные года и выбранный год
+            student_years = finance.get_student_years(student_id)
+            if not student_years:
+                student_years = [datetime.now().year]
+
+            if len(data_parts) > 3 and data_parts[3].isdigit():
+                selected_year = int(data_parts[3])
+            else:
+                selected_year = student_years[-1]
+
+            # 2. Данные за выбранный год
+            year_data = finance.get_student_yearly_report(student_id, selected_year) if hasattr(finance, 'get_student_yearly_report') else {'lessons_count': 0, 'spent': 0, 'paid': 0}
+            
+            # 3. Данные ЗА ВСЁ ВРЕМЯ (глобальные)
+            global_student_data = finance.get_student_global_report(student_id) if hasattr(finance, 'get_student_global_report') else {
+                'total_lessons': year_data.get('lessons_count', 0),
+                'total_spent': year_data.get('spent', 0),
+                'total_paid': year_data.get('paid', 0),
+                'balance': finance.get_actual_balance(student_id)
+            }
+
+            total_balance = global_student_data.get('balance', 0)
+
+            # 4. Форматирование статуса баланса
+            if total_balance > 0:
+                balance_status = f"🟢 <b>Аванс ученика:</b> <code>{total_balance:,} PLN</code>".replace(",", " ")
+            elif total_balance < 0:
+                balance_status = f"🔴 <b>Долг ученика:</b> <code>{abs(total_balance):,} PLN</code>".replace(",", " ")
+            else:
+                balance_status = "⚪️ <b>Баланс:</b> <code>0 PLN</code>"
+
+            # 5. Разделители тысяч для сумм (пробелы)
+            y_spent = f"{year_data.get('spent', 0):,}".replace(",", " ")
+            y_paid = f"{year_data.get('paid', 0):,}".replace(",", " ")
+            g_spent = f"{global_student_data.get('total_spent', 0):,}".replace(",", " ")
+            g_paid = f"{global_student_data.get('total_paid', 0):,}".replace(",", " ")
+
+            # 6. Сборка карточки
+            text = (
+                f"👤 <b>ФИНАНСЫ УЧЕНИКА: {student['name']} (ID: {student_id})</b>\n"
+                f"──────────────────────────\n"
+                f"📅 <b>Статистика за год:</b>\n\n"
+                f"▫️ <b>{selected_year} год:</b>\n"
+                f"   • Проведено уроков: {year_data.get('lessons_count', 0)} (<code>{y_spent} PLN</code>)\n"
+                f"   • Оплачено: <code>{y_paid} PLN</code>\n"
+                f"──────────────────────────\n"
+                f"🌐 <b>ИТОГО ЗА ВСЁ ВРЕМЯ:</b>\n"
+                f"📚 Всего уроков: {global_student_data.get('total_lessons', 0)} (<code>{g_spent} PLN</code>)\n"
+                f"💰 Всего оплачено: <code>{g_paid} PLN</code>\n"
+                f"{balance_status}"
+            )
+
+            markup = types.InlineKeyboardMarkup()
+
+            # Кнопки выбора годов
+            if len(student_years) > 1:
+                year_buttons = []
+                for yr in student_years:
+                    btn_text = f"• {yr} •" if yr == selected_year else str(yr)
+                    # Используем валидный callback для выбранной кнопки (чтобы при клике на нее не вылетала ошибка)
+                    cb_data = f"report_student_{student_id}_{yr}" if yr != selected_year else f"ignore_year_{yr}"
+                    year_buttons.append(types.InlineKeyboardButton(btn_text, callback_data=cb_data))
+                markup.row(*year_buttons)
+
+            # Кнопка возврата с использованием вашего back_callback
+            markup.add(types.InlineKeyboardButton("🔙 Назад в профиль", callback_data=back_callback))
         else:
             # --- ОБЩИЙ ОТЧЕТ (ПО ГОДАМ) ---
             data = finance.get_global_report()
@@ -229,5 +284,7 @@ def register_common_handlers(bot, db, finance, user_data, ui_refs):
             reply_markup=markup,
             parse_mode="HTML"
         )
-
+    @bot.callback_query_handler(func=lambda call: call.data.startswith("ignore_year_"))
+    def ignore_year_callback(call):
+        bot.answer_callback_query(call.id, text="Этот год уже выбран")
     return handle_start

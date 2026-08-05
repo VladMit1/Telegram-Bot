@@ -39,6 +39,9 @@ def register_payment_handlers(bot, db, user_data, ui_refs, finance):
     @bot.callback_query_handler(func=lambda call: call.data.startswith("pay_date_"))
     def select_date(call):
         user_id = call.from_user.id
+        chat_id = call.message.chat.id
+        msg_id = call.message.message_id  # Запоминаем ID Главного Окна
+        
         if user_id not in user_data:
             user_data[user_id] = {}
             
@@ -48,27 +51,22 @@ def register_payment_handlers(bot, db, user_data, ui_refs, finance):
         user_data[user_id].update({
             'step': 'waiting_pay_amount',
             'student_id': s_id,
-            'pay_date': sel_date
+            'pay_date': sel_date,
+            'pay_instruction_id': msg_id  # <--- Теперь это ИМЕННО ID главного окна!
         })
         
-        # Кнопка отмены возвращает в профиль студента
         markup = types.InlineKeyboardMarkup().add(
             types.InlineKeyboardButton("❌ Отмена", callback_data=f"fast_view_{s_id}")
         )
         
-        # Сначала шлем новое, потом удаляем старое (календарь)
-        sent_msg = bot.send_message(
-            call.message.chat.id, 
-            f"💰 <b>Дата: {sel_date}</b>\nВведите сумму (PLN):", 
-            reply_markup=markup, 
+        # Просто РЕДАКТИРУЕМ текущий календарь в экран ввода суммы
+        bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=msg_id,
+            text=f"💰 <b>Дата: {sel_date}</b>\nВведите сумму (PLN):",
+            reply_markup=markup,
             parse_mode="HTML"
         )
-        
-        user_data[user_id]['pay_instruction_id'] = sent_msg.message_id
-        
-        try: bot.delete_message(call.message.chat.id, call.message.message_id)
-        except: pass
-
     # --- 3. ИСТОРИЯ ПЛАТЕЖЕЙ (СПИСОК ДЛЯ УДАЛЕНИЯ) ---
     @bot.callback_query_handler(func=lambda call: call.data.startswith("history_pay_"))
     def show_payments_history(call):
@@ -160,4 +158,4 @@ def handle_payment_text(bot, db, message, user_data, ui_refs, finance): # Доб
         render_student_card(bot, chat_id, student_data, finance, is_search=True, edit_msg_id=instr_id)
     else:
         # Если ввел не число - просто уведомление (можно заменить на edit текущей инструкции)
-        bot.send_message(chat_id, "⚠️ Введите только число!", str(chat_id))
+        bot.send_message(chat_id, "⚠️ Введите только число!")
